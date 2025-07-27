@@ -1,18 +1,11 @@
-#include "DCCDecoder.h"
-#include <avr/interrupt.h>
+#include "dccdecoder.h"
+#include <iostream>
+#include <cstring>
+#include <bitset>
+//#include <Arduino.h>
+//#include <avr/interrupt.h>
 
-
-enum class DccProtocolState : uint8_t {
-  WAIT_FOR_PREAMBLE,   // Suche nach mindestens 10 Einsen
-  WAIT_FOR_STARTBIT,   // Warte auf das Startbit (0)
-  WAIT_FOR_ADDRESS,
-  READ_DATA_BYTE,      // Lese 8 Datenbits + Trennerbit
-  PACKET_COMPLETE,     // Paket vollständig empfangen
-  ERROR                // Ungültiger Zustand oder Fehler
-};
-
-
-
+/*
 constexpr uint32_t US_TO_TICKS(uint32_t us) {
     return (us * (F_CPU / 1000000UL));
 }
@@ -21,7 +14,7 @@ constexpr uint16_t DCC_MIN0_TICKS = US_TO_TICKS(52);
 constexpr uint16_t DCC_MAX0_TICKS = US_TO_TICKS(64);
 constexpr uint16_t DCC_MIN1_TICKS = US_TO_TICKS(100);
 constexpr uint16_t DCC_MAX1_TICKS = US_TO_TICKS(200);
-
+*/
 
 
 volatile int8_t vThisBit = 0;
@@ -30,7 +23,7 @@ volatile bool vPulseReceived = false;
 DCCDecoder::DCCDecoder() {}
 
 void DCCDecoder::begin(uint8_t pin) {
-    // Pin als Eingang mit Pull-Up, falls nötig
+/*    // Pin als Eingang mit Pull-Up, falls nötig
     pinMode(pin, INPUT);
 
     // TCB0 auf Event-Capture-Modus einstellen:
@@ -53,8 +46,10 @@ void DCCDecoder::begin(uint8_t pin) {
     TCB0.CTRLA = TCB_CLKSEL_DIV1_gc | TCB_ENABLE_bm;    // Taktquelle CLK_PER, Timer Enable
 
     // Wichtig: Im ISR musst du den Timer manuell zurücksetzen, da kein Auto-Reset möglich ist
+  */
 }
 
+/*
 ISR(TCB0_INT_vect) {
   uint16_t pulseLength = TCB0.CCMP;  // Timerstand kopieren
   if(pulseLength >= DCC_MIN0_TICKS && pulseLength <= DCC_MAX0_TICKS) {
@@ -71,9 +66,9 @@ ISR(TCB0_INT_vect) {
   vPulseReceived = true;               // Flag setzen
 }
 
-
+*/
 void DCCDecoder::run(){
-  
+/*  
   if(vPulseReceived){
     noInterrupts();
     int8_t thisBit = vThisBit;
@@ -82,16 +77,13 @@ void DCCDecoder::run(){
     
     addBitToBitstream(thisBit);
   }
-  evaluateBitstream();  
+  */
+  while(mState != DccProtocolState::PACKET_COMPLETE){
+    evaluateBitstream();  
+  }
 }
 
-void DCCDecoder::resetBitstream(){
-  mBitstream = 0;
-  mValidBitCount = 0;
-  mLastBit = -1;
-}
-
-void DCCDecder::addBitToBitstream(int8_t bit){
+void DCCDecoder::addBitToBitstream(int8_t bit){
   if (bit < 0) {
     resetBitstream();
     return;
@@ -118,55 +110,113 @@ void DCCDecder::addBitToBitstream(int8_t bit){
   }
 }
 
-void evaluateBitstream() {
+void DCCDecoder::resetBitstream(){
+  mBitstream = 0;
+  mValidBitCount = 0;
+  mLastBit = -1;
+  mByteCount = 0;
+  mNumOnesInPreamble = 0;
+  mState = DccProtocolState::WAIT_FOR_PREAMBLE;
+}
+
+void DCCDecoder::evaluateBitstream() {
+  int separator = -1;
+  
   switch(mState) {
     case DccProtocolState::WAIT_FOR_PREAMBLE:
-      findPreamble();
+      if(findPreamble() == true){
+        mState = DccProtocolState::READ_DATA_BYTE;
+      }
       break;
-    case DccProtocolState::WAIT_FOR_STARTBIT:
-      findStartBit();
+
+    case DccProtocolState::WAIT_FOR_SEPARATOR:
+      separator = getSeparator();
+      if(separator== 0){
+        mState = DccProtocolState::READ_DATA_BYTE;
+      } else if(separator == 1){
+        mState = DccProtocolState::PACKET_COMPLETE;
+      } else { // no separator received yet, do nothing
+      }
       break;
-    case DccProtocolState::WAIT_FOR_ADDRESS:
-      readAddressByte();
+
+    case DccProtocolState::READ_DATA_BYTE:
+      if(readDataByte() == true) {
+        mState = DccProtocolState::WAIT_FOR_SEPARATOR;
+      }
+      break;
+
+    case DccProtocolState::PACKET_COMPLETE:
+      // will never be executed, see run();
+      break;
+
+    case DccProtocolState::ERROR:
+      resetBitstream();
+      mState = DccProtocolState::WAIT_FOR_PREAMBLE;
       break;
   }
 }
 
-void findPreamble() {
-  while(mValidBitCount > 10) {
-    while( !(mBitstream & 0x0000000000000001) && (mValidBitCount > 0) ) { // solange eine Null ganz rechts steht und noch Bits vorhanden sind
-      mBitstream >>= 1;
-      mValidBitCount--;
-    }
+bool DCCDecoder::findPreamble() {
+    bool bit = 0;
     
-    if(mValidBitCount > 10) {
-      // prüfen, ob zehn Einsen ganz rechts stehen
-      if( (mBitstream & 0x3FF) == 0x3FF) {
-        mBitstream >>= 10; // alle zehn Einsen nach rechts herausschieben.
-        mValidBitCount -= 10;
-        mState = DccProtocolState::WAIT_FOR_STARTBIT;
-        return;
-      }
-      else {
-        // keine zehn Einsen --> bitstream um eines nach rechts schieben und weiter probieren.
+    while(mValidBitCount > 0) {
+        bit =(mBitstream & 0b1);
         mBitstream >>= 1;
         mValidBitCount--;
-      }
+    
+        if(bit == 1) {
+            mNumOnesInPreamble++;
+        }
+        else {
+            if(mNumOnesInPreamble >= 10) {
+                // zero was found and >= 10 ones before this zero
+                mNumOnesInPreamble = 0;
+                return true;
+            }
+            else {
+                // zero was found but not enough ones
+                mNumOnesInPreamble = 0;
+            }
+        }
     }
-  }
+    
+    return false;
 }
 
-void findStartbit() {
+int8_t DCCDecoder::getSeparator() {
+    
+  int8_t separator = -1;
   if(mValidBitCount >= 1) {
-    if( (mBitstream & 0x01) == 0) { 
-      mState = DccProtocolState::WAIT_FOR_ADDRESS;
-    }
+    separator = (mBitstream & 0x01);
     mBitstream >>= 1;
     mValidBitCount--;
   }
+  return separator;
 }
 
-void readAddressByte() {
-  
+bool DCCDecoder::readDataByte() {
+  if(mValidBitCount >= 8){
+    if(mByteCount < DCC_MAX_BYTES) {
+      mBytestream[mByteCount++] = (mBitstream & 0xFF);
+      mBitstream >>= 8;
+      mValidBitCount -= 8;
+      return true;
+    }
+    else {
+        resetBitstream();
+    }
+  }
+  return false;
 }
 
+void DCCDecoder::TESTsetBitstream(uint64_t bitstream, uint8_t numValidBits) {
+  mBitstream = bitstream;
+  std::bitset<64> x(mBitstream);
+    std::cout << x << '\n';
+  mValidBitCount = numValidBits;
+}
+
+uint8_t DCCDecoder::getBytestream(char *bytestream) {
+      memcpy(bytestream, mBytestream, mByteCount);
+      return mByteCount;
+}

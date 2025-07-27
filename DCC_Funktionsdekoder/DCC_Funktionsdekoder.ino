@@ -1,9 +1,9 @@
-#include "DCCDecoder.h"
+#include "DccSignalDecoder.h"
 
-DCCDecoder dcc;
+DccSignalDecoder dcc;
 
 void setup() {
-    dcc.begin();
+    dcc.begin(PIN_PA2);
 }
 
 void loop() {
