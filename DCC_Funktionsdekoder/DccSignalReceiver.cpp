@@ -21,7 +21,7 @@ volatile uint8_t vNumReceivedBits = 0;
 DccSignalReceiver::DccSignalReceiver() {
 }
 
-void DccSignalReceiver::begin(uint8_t pin) {
+void DccSignalReceiver::begin(int pin) {
   // Pin als Eingang mit Pull-Up, falls nötig
   pinMode(pin, INPUT);
 /*

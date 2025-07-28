@@ -1,136 +1,139 @@
 #include "DccSignalDecoder.h"
-#include "DccSignalReceiver.h"
+#include "DccSignalParser.h"
+#include <EEPROM.h>
 
-#include <cstring>
-#include <bitset>
-#include <iostream>
-
-
-DccSignalReceiver receiver;
+//#define bit_is_set(var, bit) ((var) & (1 << (bit)))
+//#define bit_is_clear(var, bit) !bit_is_set(var, bit)
 
 
-DccSignalDecoder::DccSignalDecoder() {
+DccSignalParser parser;
+char dccPacket[DCC_MAX_BYTES];
+uint8_t packetSize;
+bool newDccPacket;
+
+void DccSignalDecoder::begin(int port_pin) {
+  // read CVs
+  mAddress = getAddressFromCV();
+
+  parser.begin(port_pin, dccPacket, &packetSize, &newDccPacket);
 }
 
-void DccSignalDecoder::begin(uint8_t pin){
-  receiver.begin(pin);
-}
-
-void DccSignalDecoder::addBitsToBitstream() {
-  uint8_t numNewBits = 0;
-  uint64_t newBitstream = 0;
-  
-  receiver.getBitstream(&newBitstream, &numNewBits);
-  mBitstream |= (newBitstream << mNumBits);
-  mNumBits += numNewBits;
-}
-
-
-void DccSignalDecoder::resetBitstream(){
-  mBitstream = 0;
-  mNumBits = 0;
-  mByteCount = 0;
-  mNumOnesInPreamble = 0;
-  mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
-}
-
-void DccSignalDecoder::evaluateBitstream() {
-  int separator = -1;
-  
-  switch(mState) {
-    case DCCPROTOCOL__WAIT_FOR_PREAMBLE:
-      if(findPreamble() == true){
-        mState = DCCPROTOCOL__READ_DATA_BYTE;
-      }
-      break;
-
-    case DCCPROTOCOL__READ_DATA_BYTE:
-      if(readDataByte() == true) {
-        mState = DCCPROTOCOL__WAIT_FOR_SEPARATOR;
-      }
-      break;
-
-    case DCCPROTOCOL__WAIT_FOR_SEPARATOR:
-      separator = getSeparator();
-      if(separator == 0) {
-        mState = DCCPROTOCOL__READ_DATA_BYTE;
-      } else if(separator == 1) {
-        mState = DCCPROTOCOL__PACKET_COMPLETE;
-      } else { // no separator received yet, do nothing
-      }
-      break;
-
-    case DCCPROTOCOL__PACKET_COMPLETE:
-      // TODO: evaluate checksum
-      break;
-
-    case DCCPROTOCOL__ERROR:
-      resetBitstream();
-      mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
-      break;
+void DccSignalDecoder::run() {
+  parser.run();
+  if(newDccPacket) {
+    handleDccPacket();
+    newDccPacket = false;
   }
 }
 
-bool DccSignalDecoder::findPreamble() {
-  bool bit = 0;
-  
-  while(mNumBits > 0) {
-    bit =(mBitstream & 0b1);
-    mBitstream >>= 1;
-    mNumBits--;
+void DccSignalDecoder::handleDccPacket() {
+  if(dccPacket[0] == 0x7c) {
+    EEPROM.write(dccPacket[1], dccPacket[2]); // [1] = address; [2] = value;
+  }
+  else if (getAddressFromDcc() == mAddress) {
+    mDirection = getDirectionFromDcc();
+    mFunctions = getFunctionsFromDcc();
+  }
 
-    if(bit == 1) {
-      mNumOnesInPreamble++;
+}
+
+int16_t DccSignalDecoder::getAddressFromCV() {
+  int16_t address = -1;
+  uint8_t cv29 = EEPROM.read(29);
+
+  // check if short or long address:
+  if(bit_is_set(cv29, 5)) {
+    uint8_t cv17 = EEPROM.read(17);
+    uint8_t cv18 = EEPROM.read(18);
+    if(cv17 < 192 || cv17 > 231) {
+      address = -1;
     }
     else {
-      if(mNumOnesInPreamble >= 10) {
-        // zero was found and >= 10 ones before this zero
-        mNumOnesInPreamble = 0;
-        return true;
-      }
-      else {
-        // zero was found but not enough ones
-        mNumOnesInPreamble = 0;
-      }
+      address = ((cv17 - 192) << 8) | cv18;
+    }
+
+  }
+
+  else { // short address
+    address = EEPROM.read(1); // short address is stored in CV1
+    if(mAddress < 3 || mAddress > 127) {
+      address = -1;
     }
   }
-  return false;
+  return address;
 }
 
-int8_t DccSignalDecoder::getSeparator() {
-    
-  int8_t separator = -1;
-  if(mNumBits >= 1) {
-    separator = (mBitstream & 0b1);
-    mBitstream >>= 1;
-    mNumBits--;
+int16_t DccSignalDecoder::getAddressFromDcc() {
+  if(bit_is_clear(dccPacket[0], 7)) { // short address
+    return (dccPacket[0] & 0b01111111);
   }
-  return separator;
+  else{
+    return (((dccPacket[0] & 0b00111111) << 8) | dccPacket[1]);
+  }
 }
 
-bool DccSignalDecoder::readDataByte() {
-  if(mNumBits >= 8){
-    if(mByteCount < DCC_MAX_BYTES) {
-      mBytestream[mByteCount++] = (mBitstream & 0xFF);
-      mBitstream >>= 8;
-      mNumBits -= 8;
-      return true;
-    }
-    else {
-        resetBitstream();
-    }
+Direction DccSignalDecoder::getDirectionFromDcc() {
+  // TODO: für einfahes DCC Format sieht das aber anders aus!!
+  Direction dccDirection = bit_is_set(dccPacket[1], 7) ? FORWARD : REVERSE;
+  if(dccDirection != mDirection) {
+    mUpdate = true;
   }
-  return false;
+  return dccDirection;
 }
 
-uint8_t DccSignalDecoder::getBytestream(char *bytestream) {
-  addBitsToBitstream();
-  evaluateBitstream();  
-  
-  if(mState == DCCPROTOCOL__PACKET_COMPLETE) {
-    memcpy(bytestream, mBytestream, mByteCount);
-    mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
-    return mByteCount;
+uint32_t DccSignalDecoder::getFunctionsFromDcc() {
+  // TODO: check this, this comes from chatGPT
+  uint32_t functions = 0;
+
+  if (packetSize < 3) return mFunctions;
+
+  uint8_t opcode = dccPacket[1];
+  uint8_t data   = dccPacket[2];
+
+  // F0–F4
+  if ((opcode & 0b11100000) == 0b10000000) {
+    if (data & (1 << 4)) functions |= (1 << 0);  // F0
+    if (data & (1 << 0)) functions |= (1 << 1);  // F1
+    if (data & (1 << 1)) functions |= (1 << 2);  // F2
+    if (data & (1 << 2)) functions |= (1 << 3);  // F3
+    if (data & (1 << 3)) functions |= (1 << 4);  // F4
   }
-  return 0;
+
+  // F5–F8
+  else if ((opcode & 0b11111100) == 0b10110000) {
+    if (data & (1 << 0)) functions |= (1 << 5);  // F5
+    if (data & (1 << 1)) functions |= (1 << 6);  // F6
+    if (data & (1 << 2)) functions |= (1 << 7);  // F7
+    if (data & (1 << 3)) functions |= (1 << 8);  // F8
+  }
+
+  // F9–F12
+  else if ((opcode & 0b11111100) == 0b10110010) {
+    if (data & (1 << 0)) functions |= (1 << 9);   // F9
+    if (data & (1 << 1)) functions |= (1 << 10);  // F10
+    if (data & (1 << 2)) functions |= (1 << 11);  // F11
+    if (data & (1 << 3)) functions |= (1 << 12);  // F12
+  }
+
+  // F13–F20
+  else if ((opcode & 0b11111110) == 0b11011100) {
+    functions |= (uint32_t)(data & 0xFF) << 13;  // Bits F13–F20 → Bits 13–20
+  }
+
+  // F21–F28
+  else if ((opcode & 0b11111110) == 0b11011110) {
+      functions |= (uint32_t)(data & 0xFF) << 21;  // Bits F21–F28 → Bits 21–28
+  }
+
+  return functions;
+}
+
+bool DccSignalDecoder::getDirection() {
+  return mDirection;
+}
+
+bool DccSignalDecoder::hasUpdate() {
+  bool update = mUpdate;
+  mUpdate = false;
+  return update;
 }

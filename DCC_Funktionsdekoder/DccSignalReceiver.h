@@ -7,7 +7,7 @@
 class DccSignalReceiver {
   public:
     DccSignalReceiver();
-    void begin(uint8_t port_pin);
+    void begin(int port_pin);
     void getBitstream(uint64_t* bitstream, uint8_t* numReceivedBits);
 
 

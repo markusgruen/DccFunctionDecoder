@@ -2,10 +2,23 @@
 
 DccSignalDecoder dcc;
 
+
+// funktionen: an-/ausschalten mit verschiedenen Modi (fading, flacker, blinken, etc)
+// funktionen fahrtrichtungsabhängig schalten
+// CVs im EEProm abspeichern
+// 
+
+
 void setup() {
-    dcc.begin(PIN_PA2);
+  dcc.begin(PIN_PA2);
 }
 
 void loop() {
-    dcc.run();
+  
+
+  dcc.run();
+  if(dcc.hasUpdate()) {
+    dcc.getDirection();
+    //dcc.getFunctions();
+  }
 }
