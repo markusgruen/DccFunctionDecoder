@@ -1,6 +1,6 @@
-#include "DccSignalDecoder.h"
+#include "DccPacketParser.h"
 
-DccSignalDecoder dcc;
+DccPacketParser dcc;
 
 
 // funktionen: an-/ausschalten mit verschiedenen Modi (fading, flacker, blinken, etc)

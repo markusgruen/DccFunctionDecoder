@@ -1,14 +1,14 @@
-#ifndef DCCSIGNALDECODER_H
-#define DCCSIGNALDECODER_H
+#ifndef DCCPACKETPARSER_H
+#define DCCPACKETPARSER_H
 
 
 #include <Arduino.h>
 
 enum Direction {REVERSE, FORWARD};
 
-class DccSignalDecoder {
+class DccPacketParser {
   public:
-    DccSignalDecoder(){};
+    DccPacketParser(){};
     void begin(int port_pin);
     void run();
     bool hasUpdate();
@@ -21,6 +21,7 @@ class DccSignalDecoder {
     int16_t getAddressFromDcc();
     Direction getDirectionFromDcc();
     uint32_t getFunctionsFromDcc();
+    bool hasShortAddress();
 
     bool mUpdate = false;
     int16_t mAddress = -1;
@@ -30,6 +31,7 @@ class DccSignalDecoder {
 
 };
 
+uint32_t setBitsUint32(uint32_t original, uint32_t value, uint8_t pos, uint8_t numBits);
 
 
 #endif

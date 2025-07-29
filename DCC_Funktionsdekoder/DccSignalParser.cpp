@@ -146,8 +146,8 @@ bool DccSignalParser::checkErrorByteOK() {
 }
 
 void DccSignalParser::saveDccPacket() {
-  memcpy(mDccPacket, mByteStream, mByteCount);
-  *mPacketSize = mByteCount;
+  memcpy(mDccPacket, mByteStream, mByteCount-1);  // -1, because last byte is error-byte
+  *mPacketSize = mByteCount-1;
   *mNewDccPacket = true;
 }
 
