@@ -1,4 +1,4 @@
-#include "DccPacketParser.h"
+#include "DccPacketHandler.h"
 #include "DccSignalParser.h"
 #include <EEPROM.h>
 
@@ -11,14 +11,14 @@ char dccPacket[DCC_MAX_BYTES];
 uint8_t dccPacketSize;
 bool newDccPacket;
 
-void DccPacketParser::begin(int port_pin) {
+void DccPacketHandler::begin(int port_pin) {
   // read CVs
   mAddress = getAddressFromCV();
 
   parser.begin(port_pin, dccPacket, &dccPacketSize, &newDccPacket);
 }
 
-void DccPacketParser::run() {
+void DccPacketHandler::run() {
   parser.run();
   if(newDccPacket) {
     handleDccPacket();
@@ -26,26 +26,33 @@ void DccPacketParser::run() {
   }
 }
 
-bool DccPacketParser::getDirection() {
+Direction DccPacketHandler::getDirection() {
+  mUpdate = false;
   return mDirection;
 }
 
-uint32_t DccPacketParser::getFunctions(){
+uint8_t DccPacketHandler::getSpeed() {
+  mUpdate = false;
+  return mSpeed;
+}
+
+uint32_t DccPacketHandler::getFunctions(){
+  mUpdate = false;
   return mFunctions;
 }
 
-void DccPacketParser::handleDccPacket() {
+void DccPacketHandler::handleDccPacket() {
   if(dccPacket[0] == 0x7c) {
     EEPROM.write(dccPacket[1], dccPacket[2]); // [1] = address; [2] = value;
   }
   else if (getAddressFromDcc() == mAddress) {
     mDirection = getDirectionFromDcc();
+    mSpeed = getSpeedFromDcc();
     mFunctions = getFunctionsFromDcc();
   }
-
 }
 
-int16_t DccPacketParser::getAddressFromCV() {
+int16_t DccPacketHandler::getAddressFromCV() {
   int16_t address = -1;
   uint8_t cv29 = EEPROM.read(29);
 
@@ -71,7 +78,7 @@ int16_t DccPacketParser::getAddressFromCV() {
   return address;
 }
 
-int16_t DccPacketParser::getAddressFromDcc() {
+int16_t DccPacketHandler::getAddressFromDcc() {
   if(hasShortAddress()) {
     return (dccPacket[0] & 0b01111111);
   }
@@ -80,20 +87,33 @@ int16_t DccPacketParser::getAddressFromDcc() {
   }
 }
 
-Direction DccPacketParser::getDirectionFromDcc() {
-  Direction dccDirection = FORWARD;
+uint8_t DccPacketHandler::getSpeedFromDcc() {
+  uint8_t speed = 0;
+  uint8_t addressShift = hasShortAddress() ? 0 : 1;
+  
+  if(dccPacket[1] == 0x3F && dccPacketSize == 3+addressShift) {
+    speed = dccPacket[2+addressShift] & 0b01111111;
+  }
+  else if(dccPacketSize == 2+addressShift) {
+    speed = dccPacket[1+addressShift] & 0b00011111;
+  }
+  
+  if(speed != mSpeed) {
+    mUpdate = true;
+  }
+  return speed;
+}
 
-  if(dccPacketSize == 2) {
-    dccDirection = bit_is_set(dccPacket[1], 5) ? FORWARD : REVERSE;
+Direction DccPacketHandler::getDirectionFromDcc() {
+  Direction dccDirection = FORWARD;
+  uint8_t addressShift = hasShortAddress() ? 0 : 1;
+
+  
+  if(dccPacket[1] == 0x3F && dccPacketSize == 3+addressShift) {
+    dccDirection = bit_is_set(dccPacket[2+addressShift], 7) ? FORWARD : REVERSE;
   }
-  else if(hasShortAddress()) {
-    dccDirection = bit_is_set(dccPacket[2], 7) ? FORWARD : REVERSE;
-  }
-  else if(dccPacket[2] == 0x3F) {
-    dccDirection = bit_is_set(dccPacket[3], 7) ? FORWARD : REVERSE;
-  }
-  else {
-    dccDirection = bit_is_set(dccPacket[2], 5) ? FORWARD : REVERSE;
+  else if(dccPacketSize == 2+addressShift) {
+    dccDirection = bit_is_set(dccPacket[1+addressShift], 5) ? FORWARD : REVERSE;
   }
 
   if(dccDirection != mDirection) {
@@ -102,14 +122,10 @@ Direction DccPacketParser::getDirectionFromDcc() {
   return dccDirection;
 }
 
-uint32_t DccPacketParser::getFunctionsFromDcc() {
+uint32_t DccPacketHandler::getFunctionsFromDcc() {
   // TODO: check this, this comes from chatGPT
   uint32_t functions = 0;
-  uint8_t addressShift = 1;
-
-  if(hasShortAddress()) {
-    addressShift = 0;
-  }
+  uint8_t addressShift = hasShortAddress() ? 0 : 1;
 
   switch (dccPacket[1+addressShift] & 0b11100000) {
     case 0b10000000:
@@ -134,16 +150,19 @@ uint32_t DccPacketParser::getFunctionsFromDcc() {
       break;  
   }
   
+  if(functions != mFunctions) {
+    mUpdate = true;
+  }
   return functions;
 }
 
-bool DccPacketParser::hasUpdate() {
+bool DccPacketHandler::hasUpdate() {
   bool update = mUpdate;
   mUpdate = false;
   return update;
 }
 
-bool DccPacketParser::hasShortAddress(){
+bool DccPacketHandler::hasShortAddress(){
   return bit_is_set(dccPacket[0], 7);
 }
 

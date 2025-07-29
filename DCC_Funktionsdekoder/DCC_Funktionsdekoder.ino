@@ -1,6 +1,8 @@
-#include "DccPacketParser.h"
+#include "DccPacketHandler.h"
+#include "functionOutputController.h"
 
-DccPacketParser dcc;
+DccPacketHandler dcc;
+FunctionOutputController outputController;
 
 
 // funktionen: an-/ausschalten mit verschiedenen Modi (fading, flacker, blinken, etc)
@@ -11,14 +13,14 @@ DccPacketParser dcc;
 
 void setup() {
   dcc.begin(PIN_PA2);
+  outputController.begin();
+  outputController.readCVs();
 }
 
 void loop() {
   
-
   dcc.run();
   if(dcc.hasUpdate()) {
-    dcc.getDirection();
-    //dcc.getFunctions();
+    outputController.update(dcc.getDirection(), dcc.getSpeed(), dcc.getFunctions());
   }
 }

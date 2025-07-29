@@ -1,18 +1,19 @@
-#ifndef DCCPACKETPARSER_H
-#define DCCPACKETPARSER_H
+#ifndef DCCPACKETHANDLER_H
+#define DCCPACKETHANDLER_H
 
 
 #include <Arduino.h>
 
 enum Direction {REVERSE, FORWARD};
 
-class DccPacketParser {
+class DccPacketHandler {
   public:
-    DccPacketParser(){};
+    DccPacketHandler(){};
     void begin(int port_pin);
     void run();
     bool hasUpdate();
-    bool getDirection();
+    Direction getDirection();
+    uint8_t getSpeed();
     uint32_t getFunctions();
 
   private:
@@ -20,12 +21,14 @@ class DccPacketParser {
     int16_t getAddressFromCV();
     int16_t getAddressFromDcc();
     Direction getDirectionFromDcc();
+    uint8_t getSpeedFromDcc();
     uint32_t getFunctionsFromDcc();
     bool hasShortAddress();
 
     bool mUpdate = false;
     int16_t mAddress = -1;
     Direction mDirection = FORWARD;
+    int8_t mSpeed = 0;
     uint32_t mFunctions = 0;
 
 
