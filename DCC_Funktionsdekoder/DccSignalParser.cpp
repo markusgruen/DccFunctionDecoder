@@ -1,5 +1,5 @@
 #include "DccSignalParser.h"
-#include "DccSignalReceiver.h"
+#include "DccSignalReceiver_POLLING.h"
 
 
 DccSignalReceiver receiver;
@@ -8,12 +8,12 @@ DccSignalReceiver receiver;
 DccSignalParser::DccSignalParser() {
 }
 
-void DccSignalParser::begin(int port_pin, char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
+void DccSignalParser::begin(int pinMask, char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
   mDccPacket = dccPacket;
   mPacketSize = packetSize;
   mNewDccPacket = newDccPacket;
   
-  receiver.begin(port_pin);
+  receiver.begin(pinMask);
 }
 
 void DccSignalParser::run() {

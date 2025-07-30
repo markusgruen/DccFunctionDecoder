@@ -12,7 +12,7 @@ FunctionOutputController outputController;
 
 
 void setup() {
-  dcc.begin(PIN_PA2);
+  dcc.begin(PIN2_bm);
   outputController.begin();
   outputController.readCVs();
 }

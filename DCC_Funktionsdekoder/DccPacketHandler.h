@@ -9,7 +9,7 @@ enum Direction {REVERSE, FORWARD};
 class DccPacketHandler {
   public:
     DccPacketHandler(){};
-    void begin(int port_pin);
+    void begin(int pinMask);
     void run();
     bool hasUpdate();
     Direction getDirection();
@@ -23,7 +23,7 @@ class DccPacketHandler {
     Direction getDirectionFromDcc();
     uint8_t getSpeedFromDcc();
     uint32_t getFunctionsFromDcc();
-    bool hasShortAddress();
+    bool dccHasShortAddress();
 
     bool mUpdate = false;
     int16_t mAddress = -1;

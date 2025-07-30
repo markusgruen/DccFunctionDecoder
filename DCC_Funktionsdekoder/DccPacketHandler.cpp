@@ -11,11 +11,11 @@ char dccPacket[DCC_MAX_BYTES];
 uint8_t dccPacketSize;
 bool newDccPacket;
 
-void DccPacketHandler::begin(int port_pin) {
+void DccPacketHandler::begin(int pinMask) {
   // read CVs
   mAddress = getAddressFromCV();
 
-  parser.begin(port_pin, dccPacket, &dccPacketSize, &newDccPacket);
+  parser.begin(pinMask, dccPacket, &dccPacketSize, &newDccPacket);
 }
 
 void DccPacketHandler::run() {
@@ -42,9 +42,11 @@ uint32_t DccPacketHandler::getFunctions(){
 }
 
 void DccPacketHandler::handleDccPacket() {
+  // write CV
   if(dccPacket[0] == 0x7c) {
     EEPROM.write(dccPacket[1], dccPacket[2]); // [1] = address; [2] = value;
   }
+  // standard packet
   else if (getAddressFromDcc() == mAddress) {
     mDirection = getDirectionFromDcc();
     mSpeed = getSpeedFromDcc();
@@ -57,16 +59,15 @@ int16_t DccPacketHandler::getAddressFromCV() {
   uint8_t cv29 = EEPROM.read(29);
 
   // check if short or long address:
-  if(bit_is_set(cv29, 5)) {
+  if(bit_is_set(cv29, 4)) {
     uint8_t cv17 = EEPROM.read(17);
     uint8_t cv18 = EEPROM.read(18);
-    if(cv17 < 192 || cv17 > 231) {
+    if(cv17 > 231) {
       address = -1;
     }
     else {
       address = ((cv17 - 192) << 8) | cv18;
     }
-
   }
 
   else { // short address
@@ -79,7 +80,7 @@ int16_t DccPacketHandler::getAddressFromCV() {
 }
 
 int16_t DccPacketHandler::getAddressFromDcc() {
-  if(hasShortAddress()) {
+  if(dccHasShortAddress()) {
     return (dccPacket[0] & 0b01111111);
   }
   else{
@@ -89,7 +90,7 @@ int16_t DccPacketHandler::getAddressFromDcc() {
 
 uint8_t DccPacketHandler::getSpeedFromDcc() {
   uint8_t speed = 0;
-  uint8_t addressShift = hasShortAddress() ? 0 : 1;
+  uint8_t addressShift = dccHasShortAddress() ? 0 : 1;
   
   if(dccPacket[1] == 0x3F && dccPacketSize == 3+addressShift) {
     speed = dccPacket[2+addressShift] & 0b01111111;
@@ -106,7 +107,7 @@ uint8_t DccPacketHandler::getSpeedFromDcc() {
 
 Direction DccPacketHandler::getDirectionFromDcc() {
   Direction dccDirection = FORWARD;
-  uint8_t addressShift = hasShortAddress() ? 0 : 1;
+  uint8_t addressShift = dccHasShortAddress() ? 0 : 1;
 
   
   if(dccPacket[1] == 0x3F && dccPacketSize == 3+addressShift) {
@@ -125,7 +126,7 @@ Direction DccPacketHandler::getDirectionFromDcc() {
 uint32_t DccPacketHandler::getFunctionsFromDcc() {
   // TODO: check this, this comes from chatGPT
   uint32_t functions = 0;
-  uint8_t addressShift = hasShortAddress() ? 0 : 1;
+  uint8_t addressShift = dccHasShortAddress() ? 0 : 1;
 
   switch (dccPacket[1+addressShift] & 0b11100000) {
     case 0b10000000:
@@ -162,7 +163,7 @@ bool DccPacketHandler::hasUpdate() {
   return update;
 }
 
-bool DccPacketHandler::hasShortAddress(){
+bool DccPacketHandler::dccHasShortAddress(){
   return bit_is_set(dccPacket[0], 7);
 }
 
