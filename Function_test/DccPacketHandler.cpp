@@ -1,6 +1,7 @@
 #include "DccPacketHandler.h"
 #include "DccSignalParser.h"
 #include <EEPROM.h>
+#include "debug_uart.h"
 
 //#define bit_is_set(var, bit) ((var) & (1 << (bit)))
 //#define bit_is_clear(var, bit) !bit_is_set(var, bit)
@@ -178,7 +179,7 @@ bool DccPacketHandler::dccHasShortAddress(){
 }
 
 void DccPacketHandler::resetCVsToDefault() {
-  for (uint8_t i = 0; i < numDefaultCVs; ++i) {
+  for (uint8_t i = 0; i < numDefaultCVs; i++) {
     EEPROM.update(mDefaultCVPtr[i].address, mDefaultCVPtr[i].value);
   }
 }

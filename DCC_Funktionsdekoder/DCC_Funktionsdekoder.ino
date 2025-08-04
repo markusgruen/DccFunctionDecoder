@@ -1,8 +1,10 @@
 #include "DccPacketHandler.h"
 #include "functionOutputController.h"
+#include "CV_default_values.h"
 
 DccPacketHandler dcc;
 FunctionOutputController outputController;
+
 
 
 // funktionen: an-/ausschalten mit verschiedenen Modi (fading, flacker, blinken, etc)
@@ -12,7 +14,7 @@ FunctionOutputController outputController;
 
 
 void setup() {
-  dcc.begin(PIN2);
+  dcc.begin(PIN2, defaultCVs, numDefaultCVs);
   outputController.begin(PIN1, PIN3, PIN6, PIN7);
   outputController.readCVs();
 }

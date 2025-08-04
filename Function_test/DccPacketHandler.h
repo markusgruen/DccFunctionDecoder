@@ -21,6 +21,7 @@ class DccPacketHandler {
     Direction getDirection();
     uint8_t getSpeed();
     uint32_t getFunctions();
+    void resetCVsToDefault();
 
   private:
     void handleDccPacket();
@@ -30,7 +31,7 @@ class DccPacketHandler {
     uint8_t getSpeedFromDcc();
     uint32_t getFunctionsFromDcc();
     bool dccHasShortAddress();
-    void resetCVsToDefault();
+    
 
     bool mUpdate = false;
     int16_t mAddress = -1;
