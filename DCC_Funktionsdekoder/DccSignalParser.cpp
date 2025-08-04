@@ -8,12 +8,12 @@ DccSignalReceiver receiver;
 DccSignalParser::DccSignalParser() {
 }
 
-void DccSignalParser::begin(int pinMask, char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
+void DccSignalParser::begin(int pin, char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
   mDccPacket = dccPacket;
   mPacketSize = packetSize;
   mNewDccPacket = newDccPacket;
   
-  receiver.begin(pinMask);
+  receiver.begin(pin);
 }
 
 void DccSignalParser::run() {
@@ -22,12 +22,12 @@ void DccSignalParser::run() {
 }
 
 void DccSignalParser::addBitsToBitstream() {
-  uint8_t numNewBits = 0;
-  uint64_t newBitstream = 0;
+  uint8_t newBitstreamByte = 0;
   
-  receiver.getBitstream(&newBitstream, &numNewBits);
-  mBitstream |= (newBitstream << mNumBits);
-  mNumBits += numNewBits;
+  while(receiver.getNewBitstreamByte(&newBitstreamByte)) {
+    mBitstream |= (newBitstreamByte << 8);
+    mNumBits += 8;
+  }
 }
 
 void DccSignalParser::resetBitstream(){

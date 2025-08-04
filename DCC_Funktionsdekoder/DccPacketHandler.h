@@ -9,7 +9,7 @@ enum Direction {REVERSE, FORWARD};
 class DccPacketHandler {
   public:
     DccPacketHandler(){};
-    void begin(int pinMask);
+    void begin(int pin);
     void run();
     bool hasUpdate();
     Direction getDirection();

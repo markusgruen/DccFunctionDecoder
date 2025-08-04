@@ -12,8 +12,8 @@ FunctionOutputController outputController;
 
 
 void setup() {
-  dcc.begin(PIN2_bm);
-  outputController.begin();
+  dcc.begin(PIN2);
+  outputController.begin(PIN1, PIN3, PIN6, PIN7);
   outputController.readCVs();
 }
 

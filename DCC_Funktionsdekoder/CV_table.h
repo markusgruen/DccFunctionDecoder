@@ -16,6 +16,22 @@
 #define ch4FunctionMap1  43
 #define ch4FunctionMap2  44
 
+#define ch1SpeedThreshold 45
+#define ch2SpeedThreshold 46
+#define ch3SpeedThreshold 47
+#define ch4SpeedThreshold 48
+
+#define ch1DimmValue 49
+#define ch2DimmValue 50
+#define ch3DimmValue 51
+#define ch4DimmValue 52
+
+#define ch1Mode1 53
+#define ch2Mode1 54
+#define ch3Mode1 55
+#define ch4Mode1 56
+
+
  
 
 #endif

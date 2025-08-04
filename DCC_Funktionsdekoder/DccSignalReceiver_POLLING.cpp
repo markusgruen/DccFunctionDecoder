@@ -4,72 +4,158 @@
 
 
 extern volatile uint8_t DccSignalReceiver::mDccPinMask;
+volatile uint8_t vTimerCompareValue;
 
-/*
-constexpr uint32_t US_TO_TICKS(uint32_t us) {
+
+constexpr uint16_t US_TO_TICKS(uint16_t us) {
     return (us * (F_CPU / 1000000UL));
 }
+constexpr uint16_t DCC_SIGNAL_SAMPLE_TIME = US_TO_TICKS(10);
 
-constexpr uint16_t DCC_MIN0_TICKS = US_TO_TICKS(52);
-constexpr uint16_t DCC_MAX0_TICKS = US_TO_TICKS(64);
-constexpr uint16_t DCC_MIN1_TICKS = US_TO_TICKS(100);
-constexpr uint16_t DCC_MAX1_TICKS = US_TO_TICKS(200);
-*/
+constexpr uint16_t FILTER_SHIFT_MASK = (1<<FILTER_LENGTH);
+constexpr uint8_t FILTER_THRESHOLD = (FILTER_LENGTH+1)/2;
+
 
 #define MITTELWERT 20
 
-volatile uint64_t vBitstream = 0;
-volatile uint8_t vNumReceivedBits = 0;
+volatile uint8_t vBitstream[RINGBUF_SIZE];
+volatile uint8_t vNumReceivedBytes = 0;
+// volatile uint8_t vNumReceivedBits = 0;
+
+RingBuffer ringbuf;
 
 
 DccSignalReceiver::DccSignalReceiver() {
 }
 
-void DccSignalReceiver::begin(uint8_t pinMask) {
-  mDccPinMask = pinMask;
+void DccSignalReceiver::begin(uint8_t pin) {
+  mDccPinMask = digitalPinToBitMask(pin);
   // Pin als Eingang 
   PORTA.DIRCLR = mDccPinMask;
 
+  vTimerCompareValue = DCC_SIGNAL_SAMPLE_TIME;
 
-  // CTC (Frequency) Mode
-  TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_FRQ_gc;
+  // Disable TCB before configuring
+  TCB0.CTRLA = 0;
 
-  // 20 MHz / 4 = 5 MHz → 1 Tick = 0.2 µs
-  // 5 µs / 0.2 µs = 25 Ticks → CMP0 = 24
-  TCA0.SINGLE.CMP0 = 24;
+  // Use CLK_PER (20 MHz), enable, no prescaler
+  TCB0.CTRLA = TCB_CLKSEL_CLKDIV1_gc;  // Clock source: no division
 
-  // Enable Compare Match Interrupt
-  TCA0.SINGLE.INTCTRL = TCA_SINGLE_CMP0_bm;
+  // Enable CMP interrupt, use Timebase (not periodic)
+  TCB0.CTRLB = TCB_CNTMODE_INT_gc;     // Timebase mode (count up, interrupt on compare)
+  TCB0.CCMP = vTimerCompareValue;  // First compare match after 200 ticks
+  TCB0.INTCTRL = TCB_CAPT_bm;          // Enable compare match interrupt
 
-  // Start Timer with Prescaler 4
-  TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV4_gc | TCA_SINGLE_ENABLE_bm;
+  TCB0.CTRLA |= TCB_ENABLE_bm;      // Enable timer
 }
 
-void DccSignalReceiver::getBitstream(uint64_t* bitstream, uint8_t* numReceivedBits) {
+bool DccSignalReceiver::getNewBitstreamByte(uint8_t* pBitstreamByte) {
   noInterrupts();
-  *numReceivedBits = vNumReceivedBits;
-  *bitstream = vBitstream;
-  vNumReceivedBits = 0;
-  vBitstream = 0;
+    uint8_t head = ringbuf.head;
+    uint8_t tail = ringbuf.tail;
   interrupts();
+
+  if (tail == head) {
+    return false; // Buffer leer
+  }
+
+  *pBitstreamByte = ringbuf.buffer[tail++];
+  
+  noInterrupts();
+    ringbuf.tail = (tail & RINGBUF_MASK);
+  interrupts();
+
+  return true; 
 }
 
+
+ISR(TCB0_INT_vect) {
+  // This ISR takes ~3µs if no edge was detected,
+  // ~5 µs if an edge was detected, and
+  // ~8 µs if the received byte is saved.
+  static uint8_t sFilterShiftRegister = 0;
+  static uint8_t sFilterValue = 0;
+  static bool sOldFilterResult = 0;
+
+  static uint16_t sOldTimerValue = 0;
+  uint16_t currentTimerValue = TCB0.CNT;
+  static uint8_t sLastHalfBit = 0xFF;
+  
+  static uint8_t sBitstreamByte = 0;
+  static uint8_t sBitCount = 0;
+  
+  
+  // Pegel messen
+  bool isHigh = PORTA.IN & DccSignalReceiver::mDccPinMask;
+
+  // moving average of the last 5 measurements
+  sFilterShiftRegister <<= 1;
+  sFilterShiftRegister |= (isHigh & 0b1);
+  sFilterValue += isHigh;
+  sFilterValue -= (bool)(sFilterShiftRegister & FILTER_SHIFT_MASK);
+
+  // edge detection
+  bool thisFilterResult = sFilterValue >= FILTER_THRESHOLD;
+  bool edgeDetected = thisFilterResult != sOldFilterResult;
+  sOldFilterResult = thisFilterResult;
+  
+  // evaluate received bit
+  if(edgeDetected) {
+    uint8_t thisHalfBit = (currentTimerValue - sOldTimerValue) < THRESHOLD;
+    sOldTimerValue = currentTimerValue;
+
+    if (sLastHalfBit == 0xFF) {
+      // if this is the first half-bit
+      sLastHalfBit = thisHalfBit;
+    }
+    else {
+      // if this is the second half-bit
+      if (thisHalfBit == sLastHalfBit) {
+        sBitstreamByte |= (thisHalfBit << sBitCount++);
+
+        // save byte to ringbuffer if 8 bits have been received
+        if(sBitCount == 8) {
+          uint8_t head = ringbuf.head; // read volatile ringbuf.head only once!
+          ringbuf.buffer[head++] = sBitstreamByte;
+          ringbuf.head = (head & RINGBUF_MASK);
+          sBitCount = 0;
+        }
+      }
+
+      sLastHalfBit = 0xFF; // immer zurücksetzen nach einem Paar
+    }
+  }
+
+  // prepare timer for next interrupt
+  vTimerCompareValue += DCC_SIGNAL_SAMPLE_TIME;
+  TCB0.CCMP = vTimerCompareValue;
+  TCB0.INTFLAGS = TCB_CAPT_bm;
+}
+
+
+
+/*
 ISR(TCA0_CMP0_vect) {
+  // worst case: this ISR takes ~11 µs or ~220 ticks
   static uint8_t vLastHalfBit = 0xFF;
   static uint16_t vNumHigh = 0;
   static uint16_t vNumLow = 0;
   static uint16_t vHighCount = 0;
   static uint16_t vLowCount = 0;
+  uint8_t thisHalfBit;
 
-  if(PORTA.IN & DccSignalReceiver::mDccPinMask) {  // if DCC is high
+  // Pegel messen
+  bool isHigh = PORTA.IN & DccSignalReceiver::mDccPinMask;
+
+  if(isHigh) {
     vNumHigh++;
-    vNumLow = 0;
-    vLowCount = 0;
-  } else {
+    vNumLow = 0;    
+  } 
+  else {
     vNumLow++;
     vNumHigh = 0;
-    vHighCount = 0;
   }
+    
 
   if(vNumHigh > NUM_CONSECUTIVE_READINGS) {
     vHighCount++;
@@ -77,28 +163,40 @@ ISR(TCA0_CMP0_vect) {
     vLowCount++;
   }
 
-  // check if the current half-bit is 0, 1 or invalid
-  uint8_t thisHalfBit = (vHighCount < MITTELWERT) ? 1 : 0;
-  
-  // build the Bitstream if two consecutive half-bits are equal
-  if (vLastHalfBit == 0xFF) {
-    // if this is the first half-bit
-    vLastHalfBit = thisHalfBit;
+  bool bitReceived = false;
+
+  if(isHigh && vLowCount > 0) {
+    thisHalfBit = (vLowCount < MITTELWERT) ? 1 : 0;
+    vLowCount = 0;
+    bitReceived = true;
   }
-  else {
-    // if this is the second half-bit
-    if (thisHalfBit == vLastHalfBit) {
-      vBitstream |= (thisHalfBit << vNumReceivedBits);
-      vNumReceivedBits++;
+  else if(!isHigh && vHighCount > 0) {
+    thisHalfBit = (vHighCount < MITTELWERT) ? 1 : 0;
+    vHighCount = 0;
+    bitReceived = true;
+  }
+
+  // build the Bitstream if two consecutive half-bits are equal
+  if(bitReceived){
+    if (vLastHalfBit == 0xFF) {
+      // if this is the first half-bit
+      vLastHalfBit = thisHalfBit;
     }
     else {
-      vBitstream = 0ULL;
-      vNumReceivedBits = 0;
-    }
+      // if this is the second half-bit
+      if (thisHalfBit == vLastHalfBit) {
+        vBitstream |= (thisHalfBit << vNumReceivedBits);
+        vNumReceivedBits++;
+      }
+      // else {
+      //   vBitstream = 0ULL;
+      //   vNumReceivedBits = 0;
+      // }
 
-    vLastHalfBit = 0xFF; // immer zurücksetzen nach einem Paar
+      vLastHalfBit = 0xFF; // immer zurücksetzen nach einem Paar
+    }
   }
 
   TCA0.SINGLE.INTFLAGS = TCA_SINGLE_CMP0_bm;  // clear flag
 }
-
+*/

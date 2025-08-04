@@ -11,11 +11,11 @@ char dccPacket[DCC_MAX_BYTES];
 uint8_t dccPacketSize;
 bool newDccPacket;
 
-void DccPacketHandler::begin(int pinMask) {
+void DccPacketHandler::begin(int pin) {
   // read CVs
   mAddress = getAddressFromCV();
 
-  parser.begin(pinMask, dccPacket, &dccPacketSize, &newDccPacket);
+  parser.begin(pin, dccPacket, &dccPacketSize, &newDccPacket);
 }
 
 void DccPacketHandler::run() {
@@ -124,7 +124,7 @@ Direction DccPacketHandler::getDirectionFromDcc() {
 }
 
 uint32_t DccPacketHandler::getFunctionsFromDcc() {
-  // TODO: check this, this comes from chatGPT
+
   uint32_t functions = 0;
   uint8_t addressShift = dccHasShortAddress() ? 0 : 1;
 
