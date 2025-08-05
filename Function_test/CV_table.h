@@ -33,6 +33,11 @@
 #define ch3Mode1 55
 #define ch4Mode1 56
 
+#define ch1MultiFunction 57
+#define ch2MultiFunction 58
+#define ch3MultiFunction 59
+#define ch4MultiFunction 60
+
 
  
 

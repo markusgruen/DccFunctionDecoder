@@ -25,4 +25,5 @@ void loop() {
   if(dcc.hasUpdate()) {
     outputController.update(dcc.getDirection(), dcc.getSpeed(), dcc.getFunctions());
   }
+  outputController.run();
 }

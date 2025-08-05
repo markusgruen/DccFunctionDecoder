@@ -4,9 +4,28 @@
 #include <EEPROM.h>
 #include "debug_uart.h"
 
+// Global variables
+bool timerAHasOverflown = false;
+volatile uint8_t rtcOverflowCounter = 0;
+
+
 volatile uint8_t FunctionOutputController::pwmValues[NUM_CHANNELS] = {0};
 uint8_t FunctionOutputController::mChannelPin_bm[NUM_CHANNELS] = {0};
 
+
+void checkTimerAOverflow(){
+  static uint16_t oldTimerValue = 0;
+  uint16_t currentTimerValue = TCA0.SINGLE.CNT;
+
+  if(currentTimerValue < oldTimerValue) {
+    oldTimerValue = currentTimerValue;
+    timerAHasOverflown = true;
+  }
+  else {
+    oldTimerValue = currentTimerValue;
+    timerAHasOverflown = false;
+  }
+}
 
 FunctionOutputController::FunctionOutputController(){
 
@@ -16,10 +35,31 @@ FunctionOutputController::FunctionOutputController(){
   mChannelPinState[2] = OFF;
   mChannelPinState[3] = OFF;
 
-  mMode[0] = ONOFF;
+  mMode[0] = BLINK;
   mMode[1] = ONOFF;
   mMode[2] = ONOFF;
   mMode[3] = ONOFF;
+
+  mFunctionMap[0] = 0b00000010;
+  mFunctionMap[1] = 0b00000100;
+  mFunctionMap[2] = 0b00001000;
+  mFunctionMap[3] = 0b00010000;
+
+  mSpeedThreshold[0] = 255;
+  mSpeedThreshold[1] = 255;
+  mSpeedThreshold[2] = 255;
+  mSpeedThreshold[3] = 255;
+
+  mDimmValue[0] = 127;
+  mDimmValue[1] = 127;
+  mDimmValue[2] = 127;
+  mDimmValue[3] = 127;
+
+  mMultiFunctionValue[0] = 30;
+  mMultiFunctionValue[1] = 255;
+  mMultiFunctionValue[2] = 255;
+  mMultiFunctionValue[3] = 255;
+
 }
 
 void FunctionOutputController::begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, uint8_t pin4){
@@ -30,6 +70,14 @@ void FunctionOutputController::begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, u
   TCA0.SINGLE.PER = 74;                            // Compare match nach 75 Takten = 30 µs
   TCA0.SINGLE.INTCTRL = TCA_SINGLE_CMP0_bm;        // Compare match interrupt aktivieren
   TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm;       // Timer aktivieren
+
+  // setup RTC for 10 ms Interrupt
+  RTC.CTRLA = 0;                                      // stop RTC
+  RTC.CLKSEL = RTC_CLKSEL_INT32K_gc;                  // select 32.768 Osc. as source
+  RTC.PER = 327;                                      // period = 327 ticks ~= 10 ms
+  RTC.INTFLAGS = RTC_OVF_bm;                          // clear Overflow flag
+  RTC.INTCTRL = RTC_OVF_bm;                           // activate overflow interrupt
+  RTC.CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;   // Prescaler 1, start RTC
 
   // configure output pins
   mChannelPin_bm[0] = (1 << pin1);
@@ -74,6 +122,11 @@ void FunctionOutputController::readCVs() {
   mMode[1] = (Mode)EEPROM.read(ch2Mode1);
   mMode[2] = (Mode)EEPROM.read(ch3Mode1);
   mMode[3] = (Mode)EEPROM.read(ch4Mode1);
+
+  mMultiFunctionValue[0] = EEPROM.read(ch1MultiFunction);
+  mMultiFunctionValue[1] = EEPROM.read(ch2MultiFunction);
+  mMultiFunctionValue[2] = EEPROM.read(ch3MultiFunction);
+  mMultiFunctionValue[3] = EEPROM.read(ch4MultiFunction);
 }
 
 void FunctionOutputController::update(Direction direction, uint8_t speed, uint32_t functions) {
@@ -90,12 +143,37 @@ void FunctionOutputController::update(Direction direction, uint8_t speed, uint32
   }
 }
 
+void FunctionOutputController::run() {
+  static uint16_t sCounter[NUM_CHANNELS] = {0};
+
+  checkTimerAOverflow();
+  for(uint8_t channel=0; channel<NUM_CHANNELS; channel++){
+    switch(mMode[channel]) {
+      case FADE:
+        fade(channel, &sCounter[channel]);
+        break;
+      case BLINK:
+        blink(channel);
+        break;
+    }
+  }
+}
+
 void FunctionOutputController::switchOn(uint8_t channel) {
+
   if(mChannelPinState[channel] == OFF || mChannelPinState[channel] == TRANSITION_OFF) {
     switch(mMode[channel]) {
       case ONOFF:
         pwmValues[channel] = mDimmValue[channel];
         mChannelPinState[channel] = ON;  
+        break;
+      case FADE:
+        pwmValues[channel] = 0;
+        mChannelPinState[channel] = TRANSITION_ON;
+        break;
+      case BLINK:
+        pwmValues[channel] = 0;
+        mChannelPinState[channel] = ON;
         break;
     }
   }
@@ -112,6 +190,32 @@ void FunctionOutputController::switchOff(uint8_t channel) {
   }
 }
 
+void FunctionOutputController::fade(uint8_t channel, uint16_t* counter) {
+  if (mChannelPinState[channel] == TRANSITION_ON || mChannelPinState[channel] == TRANSITION_OFF) {
+    int8_t dir = (mChannelPinState[channel] == TRANSITION_ON) ? +1 : -1;
+    uint8_t target = (dir > 0) ? mDimmValue[channel] : 0;
+    State nextState = (dir > 0) ? ON : OFF;
+
+    if(timerAHasOverflown) {
+      if(++(*counter) >= 16*mMultiFunctionValue[channel]) {
+        *counter = 0;
+        pwmValues[channel] += dir;
+        if (pwmValues[channel] == target){
+          mChannelPinState[channel] = nextState;
+        }
+      }
+    }
+  }
+}
+
+void FunctionOutputController::blink(uint8_t channel) {
+  static uint8_t nextEvent[NUM_CHANNELS] = {0};
+  if(rtcOverflowCounter == nextEvent[channel]) {
+    nextEvent[channel] += mMultiFunctionValue[channel];
+    pwmValues[channel] = (pwmValues[channel] == 0) ? mDimmValue[channel] : 0;
+  }
+}
+
 ISR(TCA0_CMP0_vect) {
   static uint8_t sPwmCounter = 0;
 
@@ -124,4 +228,9 @@ ISR(TCA0_CMP0_vect) {
   }
   sPwmCounter++;
   TCA0.SINGLE.INTFLAGS = TCA_SINGLE_CMP0_bm; // Interrupt-Flag löschen
+}
+
+ISR(RTC_CNT_vect) {
+  RTC.INTFLAGS = RTC_OVF_bm; // Flag löschen
+  rtcOverflowCounter++;
 }

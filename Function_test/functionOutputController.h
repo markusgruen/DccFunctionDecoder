@@ -17,6 +17,7 @@ class FunctionOutputController {
     static void begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, uint8_t pin4);
     void readCVs();
     void update(Direction direction, uint8_t speed, uint32_t functions);
+    void run();
 
     static uint8_t mChannelPin_bm[NUM_CHANNELS];
     static volatile uint8_t pwmValues[NUM_CHANNELS];
@@ -36,12 +37,14 @@ class FunctionOutputController {
     bool IsSpeedBelowLimit(uint8_t channel, uint8_t speed) {
       return speed <= mSpeedThreshold[channel]; }
 
-    
+    void fade(uint8_t channel, uint16_t* counter);
+    void blink(uint8_t channel);
 
     uint32_t mFunctions;
     uint32_t mFunctionMap[NUM_CHANNELS];
     uint8_t mSpeedThreshold[NUM_CHANNELS];
     uint8_t mDimmValue[NUM_CHANNELS];
+    uint8_t mMultiFunctionValue[NUM_CHANNELS];
     Mode mMode[NUM_CHANNELS];
     Direction mDirection = FORWARD;
 

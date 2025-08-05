@@ -17,14 +17,13 @@ void setup() {
   debug_uart_init();
   debug_uart_print("TEST");
   
-  dcc.begin(4, defaultCVs, numDefaultCVs);
-  dcc.resetCVsToDefault();
-  uint8_t value = EEPROM.read(29);
-  debug_uart_write(value);
+  // dcc.begin(4, defaultCVs, numDefaultCVs);
+  // dcc.resetCVsToDefault();
+  // uint8_t value = EEPROM.read(29);
+  // debug_uart_write(value);
   
-  // put your setup code here, to run once:
   outputController.begin(PIN7, PIN2, PIN3, PIN6);
-  outputController.readCVs();
+  //outputController.readCVs();
 
 }
 
@@ -32,5 +31,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   uint32_t functions = 0b00000000000000000000000000000010;
   outputController.update(FORWARD, 10, functions);
-  while(1);
+  while(1) {
+    outputController.run();
+  }
 }
