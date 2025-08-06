@@ -1,17 +1,22 @@
 #include "DccPacketHandler.h"
-#include "functionOutputController.h"
+#include "outputController.h"
 #include "CV_default_values.h"
 
 DccPacketHandler dcc;
-FunctionOutputController outputController;
+OutputController outputController;
 
 
-
-// funktionen: an-/ausschalten mit verschiedenen Modi (fading, flacker, blinken, etc)
-// funktionen fahrtrichtungsabhängig schalten
-// CVs im EEProm abspeichern
-// 
-
+// TODO
+// - consist Adresse
+// - Neon
+// - fadeBlink
+// - fade Wechselblink
+// - wechselblinken
+// - doppelblitz(?)
+// - 
+//
+// zum Code sparen:
+// - alle pins fest vergeben und nicht parametrierbar machen
 
 void setup() {
   dcc.begin(PIN2, defaultCVs, numDefaultCVs);

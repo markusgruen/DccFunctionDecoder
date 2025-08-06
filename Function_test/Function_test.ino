@@ -1,11 +1,9 @@
 #include "DccPacketHandler.h"
-#include "functionOutputController.h"
+#include "outputController.h"
 #include <EEPROM.h>
-// #include "i2cDebugger.h"
-// #include "DebugBitBang.h"
 #include "debug_uart.h"
 
-FunctionOutputController outputController;
+OutputController outputController;
 DccPacketHandler dcc;
 
 
