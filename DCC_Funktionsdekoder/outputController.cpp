@@ -5,7 +5,11 @@
 
 
 // Global variables
-volatile uint16_t rtcOverflowCounter = 0;
+// volatile uint16_t rtcOverflowCounter = 0;
+uint16_t rtcOverflowCounter;
+volatile uint8_t OutputController::pwmValues[NUM_CHANNELS] = {0};
+uint8_t OutputController::mChannelPin_bm[NUM_CHANNELS] = {0};
+
 
 uint16_t lfsr16 = 0xACE1;
 uint16_t lfsr16_next() {
@@ -17,8 +21,6 @@ uint16_t lfsr16_next() {
 }
 
 
-volatile uint8_t OutputController::pwmValues[NUM_CHANNELS] = {0};
-uint8_t OutputController::mChannelPin_bm[NUM_CHANNELS] = {0};
 
 OutputController::OutputController(){
 /*
@@ -48,10 +50,20 @@ OutputController::OutputController(){
   mDimmValue[2] = 127;
   mDimmValue[3] = 127;
 
-  mMultiFunctionValue[0] = 10;
-  mMultiFunctionValue[1] = 255;
-  mMultiFunctionValue[2] = 255;
-  mMultiFunctionValue[3] = 255;
+  mFadeSpeed[0] = 10;
+  mFadeSpeed[1] = 10;
+  mFadeSpeed[2] = 10;
+  mFadeSpeed[3] = 10;
+
+  mBlinkOnTime[0] = 1;
+  mBlinkOnTime[1] = 20;
+  mBlinkOnTime[2] = 20;
+  mBlinkOnTime[3] = 20;
+
+  mBlinkOffTime[0] = 127;
+  mBlinkOffTime[1] = 127;
+  mBlinkOffTime[2] = 127;
+  mBlinkOffTime[3] = 127;
 */
 }
 
@@ -219,7 +231,14 @@ void OutputController::fade(uint8_t channel, uint16_t* nextEvent) {
     uint8_t target = (dir > 0) ? mDimmValue[channel] : 0;
     State nextState = (dir > 0) ? ON : OFF;
 
-    if(rtcOverflowCounter == *nextEvent) {
+    
+    cli();
+    __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+    uint16_t overflowCounter = rtcOverflowCounter;
+    __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+    sei();
+
+    if(overflowCounter == *nextEvent) {
       *nextEvent += mFadeSpeed[channel];
       pwmValues[channel] += dir;
       if (pwmValues[channel] == target){
@@ -234,8 +253,14 @@ void OutputController::blink(uint8_t channel, uint16_t* nextEvent) {
   uint8_t waitTime = isOn ? mBlinkOffTime[channel] : mBlinkOnTime[channel];
   uint8_t nextValue = isOn ? 0 : mDimmValue[channel]; 
 
-  if(rtcOverflowCounter == *nextEvent) {
-    *nextEvent += 5*waitTime;
+  cli();
+  __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+  uint16_t overflowCounter = rtcOverflowCounter;
+  __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+  sei();
+
+  if(overflowCounter == *nextEvent) {
+    *nextEvent += 10*waitTime;
     pwmValues[channel] = nextValue;
   }
 }
