@@ -20,7 +20,7 @@ void setup() {
   // uint8_t value = EEPROM.read(29);
   // debug_uart_write(value);
   
-  outputController.begin(PIN7, PIN2, PIN3, PIN6);
+  outputController.begin();
   //outputController.readCVs();
 
 }

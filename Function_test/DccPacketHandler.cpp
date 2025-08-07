@@ -1,7 +1,7 @@
 #include "DccPacketHandler.h"
 #include "DccSignalParser.h"
 #include <EEPROM.h>
-#include "debug_uart.h"
+
 
 //#define bit_is_set(var, bit) ((var) & (1 << (bit)))
 //#define bit_is_clear(var, bit) !bit_is_set(var, bit)
@@ -14,14 +14,14 @@ bool newDccPacket;
 
 void(* resetController) (void) = 0;
 
-void DccPacketHandler::begin(int pin, const CVDefaults* defaults, uint8_t numCVdefaults) {
+void DccPacketHandler::begin(const CVDefaults* defaults, uint8_t numCVdefaults) {
   // read CVs
   mAddress = getAddressFromCV();
   mConsistAddress = getConsistAddressFromCV();
   mDefaultCVPtr = defaults;
   mDefaultCVcount = numCVdefaults;
 
-  parser.begin(pin, dccPacket, &dccPacketSize, &newDccPacket);
+  parser.begin(dccPacket, &dccPacketSize, &newDccPacket);
 }
 
 void DccPacketHandler::run() {

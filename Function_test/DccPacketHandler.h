@@ -15,7 +15,7 @@ uint32_t setBitsUint32(uint32_t original, uint32_t value, uint8_t pos, uint8_t n
 class DccPacketHandler {
   public:
     DccPacketHandler(){};
-    void begin(int pin, const CVDefaults* defaults, uint8_t numCVdefaults);
+    void begin(const CVDefaults* defaults, uint8_t numCVdefaults);
     void run();
     bool hasUpdate();
     Direction getDirection();

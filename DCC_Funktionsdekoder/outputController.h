@@ -2,9 +2,8 @@
 #define OUTPUTCONTROLLER_H
 
 #include "DccPacketHandler.h"  // for "Direction"
+#include "pinmap.h"
 
-
-#define NUM_CHANNELS 4
 
 #define PWM_MAX 0xFF
 
@@ -14,12 +13,11 @@ enum Mode{ONOFF, FADE, NEON, BLINK, DOUBLE_BLINK, GYRA, MARS};
 class OutputController {
   public:
     OutputController();
-    static void begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, uint8_t pin4);
+    static void begin();
     void readCVs();
     void update(Direction direction, uint8_t speed, uint32_t functions);
     void run();
 
-    static uint8_t mChannelPin_bm[NUM_CHANNELS];
     static volatile uint8_t pwmValues[NUM_CHANNELS];
 
   private:

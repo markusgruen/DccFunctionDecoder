@@ -8,12 +8,12 @@ DccSignalReceiver receiver;
 DccSignalParser::DccSignalParser() {
 }
 
-void DccSignalParser::begin(int pin, char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
+void DccSignalParser::begin(char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
   mDccPacket = dccPacket;
   mPacketSize = packetSize;
   mNewDccPacket = newDccPacket;
   
-  receiver.begin(pin);
+  receiver.begin();
 }
 
 void DccSignalParser::run() {

@@ -4,12 +4,13 @@
 #include <EEPROM.h>
 
 
+
 // Global variables
 // volatile uint16_t rtcOverflowCounter = 0;
 uint16_t rtcOverflowCounter;
 volatile uint8_t OutputController::pwmValues[NUM_CHANNELS] = {0};
-uint8_t OutputController::mChannelPin_bm[NUM_CHANNELS] = {0};
-
+const uint8_t channelPin_bm[NUM_CHANNELS] = {CH1_PIN, CH2_PIN, CH3_PIN, CH4_PIN};
+uint8_t flackerCount;
 
 uint16_t lfsr16 = 0xACE1;
 uint16_t lfsr16_next() {
@@ -30,7 +31,7 @@ OutputController::OutputController(){
   mChannelPinState[2] = OFF;
   mChannelPinState[3] = OFF;
 
-  mMode[0] = BLINK;
+  mMode[0] = NEON;
   mMode[1] = ONOFF;
   mMode[2] = ONOFF;
   mMode[3] = ONOFF;
@@ -60,14 +61,14 @@ OutputController::OutputController(){
   mBlinkOnTime[2] = 20;
   mBlinkOnTime[3] = 20;
 
-  mBlinkOffTime[0] = 255;
+  mBlinkOffTime[0] = 127;
   mBlinkOffTime[1] = 127;
   mBlinkOffTime[2] = 127;
   mBlinkOffTime[3] = 127;
 
 }
 
-void OutputController::begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, uint8_t pin4){
+void OutputController::begin(){
 
   // setup Timer A for software-PWM with >100Hz frequency at 8bit resolution
   // 20 MHz / 8 = 2.5 MHz → 1 Takt = 0.4 µs → 30 µs = 75 Takte
@@ -85,15 +86,8 @@ void OutputController::begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, uint8_t p
   RTC.CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;   // Prescaler 1, start RTC
 
   // configure output pins
-  mChannelPin_bm[0] = (1 << pin1);
-  mChannelPin_bm[1] = (1 << pin2);
-  mChannelPin_bm[2] = (1 << pin3);
-  mChannelPin_bm[3] = (1 << pin4);
 
-  PORTA.DIRSET |= mChannelPin_bm[0];
-  PORTA.DIRSET |= mChannelPin_bm[1];
-  PORTA.DIRSET |= mChannelPin_bm[2];
-  PORTA.DIRSET |= mChannelPin_bm[3];
+  PORTA.DIRSET |= (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
 }
 
 void OutputController::readCVs() {
@@ -195,6 +189,7 @@ void OutputController::switchOn(uint8_t channel) {
         mChannelPinState[channel] = ON;
         break;
       case NEON:
+        flackerCount = 0;
         mChannelPinState[channel] = TRANSITION_ON;
         break;
     }
@@ -262,22 +257,31 @@ void OutputController::blink(uint8_t channel, uint16_t* nextEvent) {
   if(overflowCounter == *nextEvent) {
     *nextEvent += 10*waitTime;
     pwmValues[channel] = nextValue;
+    flackerCount++;
   }
 }
 
 enum TubeState{FLICKER, RAMP_UP};
 void OutputController::neon(uint8_t channel, uint16_t* nextEvent) {
-  // static uint8_t sCounter = 0;
+  static TubeState tubeState = FLICKER;
+  mBlinkOnTime[channel] = 1;
 
-  // if (mChannelPinState[channel] == TRANSITION_ON) {
-  //   if(rtcOverflowCounter == *nextEvent) {
-  //     if(sCounter++ >= ((lfsr16_next() % 5) + 6)) {
-  //       pwmValues[channel] = mDimmValue[channel]/2;
-  //       mMultiFunctionValue[channel] = 30; // langsames faden
-  //       mMode[channel] = FADE;
-  //     }
-  //   }
-  // }
+  if (mChannelPinState[channel] == TRANSITION_ON) {
+    if(tubeState == FLICKER){
+      if(flackerCount <= ((lfsr16_next() % 6) + 8)) {  // random(6,11)
+        mBlinkOffTime[channel] = ((lfsr16_next() % 80) + 20); // random(100,300)
+        blink(channel, nextEvent);
+      }
+      else {
+        tubeState = RAMP_UP;
+      }
+    }
+    else {
+      pwmValues[channel] = mDimmValue[channel]/16;
+      mFadeSpeed[channel] = 150; // langsames faden
+      mMode[channel] = FADE;
+    }
+  }
 
 
   // static TubeState tubeState = FLICKER;
@@ -316,9 +320,9 @@ ISR(TCA0_CMP0_vect) {
 
   for (uint8_t channel=0; channel<NUM_CHANNELS; channel++) {
     if (sPwmCounter < OutputController::pwmValues[channel]) {
-      PORTA.OUTSET = OutputController::mChannelPin_bm[channel];  // High
+      PORTA.OUTSET = channelPin_bm[channel];  // High
     } else {
-      PORTA.OUTCLR = OutputController::mChannelPin_bm[channel];  // Low
+      PORTA.OUTCLR = channelPin_bm[channel];  // Low
     }
   }
   sPwmCounter++;

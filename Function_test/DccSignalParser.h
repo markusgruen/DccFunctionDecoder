@@ -18,7 +18,7 @@ enum DccProtocolState{
 class DccSignalParser {
   public:
     DccSignalParser();
-    void begin(int pin, char* dccPacket, uint8_t* packetSize, bool* newDccPacket);  // z.B. PIN_PA2
+    void begin(char* dccPacket, uint8_t* packetSize, bool* newDccPacket);  // z.B. PIN_PA2
     void run();
 
   private:

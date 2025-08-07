@@ -19,8 +19,8 @@ OutputController outputController;
 // - alle pins fest vergeben und nicht parametrierbar machen
 
 void setup() {
-  dcc.begin(PIN2, defaultCVs, numDefaultCVs);
-  outputController.begin(PIN1, PIN3, PIN6, PIN7);
+  dcc.begin(defaultCVs, numDefaultCVs);
+  outputController.begin();
   outputController.readCVs();
 }
 

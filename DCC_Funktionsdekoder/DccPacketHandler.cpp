@@ -14,14 +14,14 @@ bool newDccPacket;
 
 void(* resetController) (void) = 0;
 
-void DccPacketHandler::begin(int pin, const CVDefaults* defaults, uint8_t numCVdefaults) {
+void DccPacketHandler::begin(const CVDefaults* defaults, uint8_t numCVdefaults) {
   // read CVs
   mAddress = getAddressFromCV();
   mConsistAddress = getConsistAddressFromCV();
   mDefaultCVPtr = defaults;
   mDefaultCVcount = numCVdefaults;
 
-  parser.begin(pin, dccPacket, &dccPacketSize, &newDccPacket);
+  parser.begin(dccPacket, &dccPacketSize, &newDccPacket);
 }
 
 void DccPacketHandler::run() {

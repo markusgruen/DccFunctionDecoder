@@ -21,10 +21,10 @@ typedef struct {
 class DccSignalReceiver {
   public:
     DccSignalReceiver();
-    static void begin(uint8_t pin);
+    static void begin();
     bool getNewBitstreamByte(uint8_t* bitstreamByte);
 
-    static volatile uint8_t mDccPinMask;
+    // static volatile uint8_t mDccPinMask;
 };
 
 #endif

@@ -1,9 +1,10 @@
 #include "DccSignalReceiver_POLLING.h"
 #include <Arduino.h>
 #include <avr/interrupt.h>
+#include "pinmap.h"
 
 
-extern volatile uint8_t DccSignalReceiver::mDccPinMask;
+// extern volatile uint8_t DccSignalReceiver::mDccPinMask;
 volatile uint8_t vTimerCompareValue;
 
 
@@ -20,7 +21,6 @@ constexpr uint8_t FILTER_THRESHOLD = (FILTER_LENGTH+1)/2;
 
 volatile uint8_t vBitstream[RINGBUF_SIZE];
 volatile uint8_t vNumReceivedBytes = 0;
-// volatile uint8_t vNumReceivedBits = 0;
 
 RingBuffer ringbuf;
 
@@ -28,10 +28,10 @@ RingBuffer ringbuf;
 DccSignalReceiver::DccSignalReceiver() {
 }
 
-void DccSignalReceiver::begin(uint8_t pin) {
-  mDccPinMask = digitalPinToBitMask(pin);
+void DccSignalReceiver::begin() {
+  // mDccPinMask = digitalPinToBitMask(pin);
   // Pin als Eingang 
-  PORTA.DIRCLR = mDccPinMask;
+  PORTA.DIRCLR = DCC_PIN;
 
   vTimerCompareValue = DCC_SIGNAL_SAMPLE_TIME;
 
@@ -86,7 +86,8 @@ ISR(TCB0_INT_vect) {
   
   
   // Pegel messen
-  bool isHigh = PORTA.IN & DccSignalReceiver::mDccPinMask;
+  // bool isHigh = PORTA.IN & DccSignalReceiver::mDccPinMask;
+  bool isHigh = PORTA.IN & DCC_PIN;
 
   // moving average of the last 5 measurements
   sFilterShiftRegister <<= 1;
