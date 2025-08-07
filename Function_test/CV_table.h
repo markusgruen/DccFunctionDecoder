@@ -33,11 +33,20 @@
 #define ch3Mode1 55
 #define ch4Mode1 56
 
-#define ch1MultiFunction 57
-#define ch2MultiFunction 58
-#define ch3MultiFunction 59
-#define ch4MultiFunction 60
+#define ch1FadeSpeed 57
+#define ch2FadeSpeed 58
+#define ch3FadeSpeed 59
+#define ch4FadeSpeed 60
 
+#define ch1BlinkOnTime 61
+#define ch2BlinkOnTime 62
+#define ch3BlinkOnTime 63
+#define ch4BlinkOnTime 64
+
+#define ch1BlinkOffTime 65
+#define ch2BlinkOffTime 66
+#define ch3BlinkOffTime 67
+#define ch4BlinkOffTime 68
 
  
 

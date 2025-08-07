@@ -2,6 +2,7 @@
 
 const CVDefaults defaultCVs[] = {
   {1, 3},     // CV1 = 3 (z. B. Lok-Adresse)
+  {19, 0},    // CV19 = 0 (Consist-Adresse)
   {29, 6},    // CV29 = 6 (z. B. Konfigurationsregister)
   {33, 0b00000010},    // CV29 = 6 (z. B. Konfigurationsregister)
   {34, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
@@ -31,6 +32,14 @@ const CVDefaults defaultCVs[] = {
   {58, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
   {59, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
   {60, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {61, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {62, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {63, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {64, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {65, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {66, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {67, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
+  {68, 0},    // CV29 = 6 (z. B. Konfigurationsregister)
 };
 
 const uint8_t numDefaultCVs = sizeof(defaultCVs) / sizeof(CVDefaults);

@@ -7,43 +7,52 @@
 // Global variables
 volatile uint16_t rtcOverflowCounter = 0;
 
+uint16_t lfsr16 = 0xACE1;
+uint16_t lfsr16_next() {
+  // Xorshift-basierter 16-bit LFSR
+  lfsr16 ^= lfsr16 << 7;
+  lfsr16 ^= lfsr16 >> 9;
+  lfsr16 ^= lfsr16 << 8;
+  return lfsr16;
+}
+
 
 volatile uint8_t OutputController::pwmValues[NUM_CHANNELS] = {0};
 uint8_t OutputController::mChannelPin_bm[NUM_CHANNELS] = {0};
 
 OutputController::OutputController(){
-
+/*
   // DELETE
-  // mChannelPinState[0] = OFF;
-  // mChannelPinState[1] = OFF;
-  // mChannelPinState[2] = OFF;
-  // mChannelPinState[3] = OFF;
+  mChannelPinState[0] = OFF;
+  mChannelPinState[1] = OFF;
+  mChannelPinState[2] = OFF;
+  mChannelPinState[3] = OFF;
 
-  // mMode[0] = BLINK;
-  // mMode[1] = ONOFF;
-  // mMode[2] = ONOFF;
-  // mMode[3] = ONOFF;
+  mMode[0] = BLINK;
+  mMode[1] = ONOFF;
+  mMode[2] = ONOFF;
+  mMode[3] = ONOFF;
 
-  // mFunctionMap[0] = 0b00000010;
-  // mFunctionMap[1] = 0b00000100;
-  // mFunctionMap[2] = 0b00001000;
-  // mFunctionMap[3] = 0b00010000;
+  mFunctionMap[0] = 0b00000010;
+  mFunctionMap[1] = 0b00000100;
+  mFunctionMap[2] = 0b00001000;
+  mFunctionMap[3] = 0b00010000;
 
-  // mSpeedThreshold[0] = 255;
-  // mSpeedThreshold[1] = 255;
-  // mSpeedThreshold[2] = 255;
-  // mSpeedThreshold[3] = 255;
+  mSpeedThreshold[0] = 255;
+  mSpeedThreshold[1] = 255;
+  mSpeedThreshold[2] = 255;
+  mSpeedThreshold[3] = 255;
 
-  // mDimmValue[0] = 127;
-  // mDimmValue[1] = 127;
-  // mDimmValue[2] = 127;
-  // mDimmValue[3] = 127;
+  mDimmValue[0] = 127;
+  mDimmValue[1] = 127;
+  mDimmValue[2] = 127;
+  mDimmValue[3] = 127;
 
-  // mMultiFunctionValue[0] = 10;
-  // mMultiFunctionValue[1] = 255;
-  // mMultiFunctionValue[2] = 255;
-  // mMultiFunctionValue[3] = 255;
-
+  mMultiFunctionValue[0] = 10;
+  mMultiFunctionValue[1] = 255;
+  mMultiFunctionValue[2] = 255;
+  mMultiFunctionValue[3] = 255;
+*/
 }
 
 void OutputController::begin(uint8_t pin1, uint8_t pin2, uint8_t pin3, uint8_t pin4){
@@ -107,10 +116,20 @@ void OutputController::readCVs() {
   mMode[2] = (Mode)EEPROM.read(ch3Mode1);
   mMode[3] = (Mode)EEPROM.read(ch4Mode1);
 
-  mMultiFunctionValue[0] = EEPROM.read(ch1MultiFunction);
-  mMultiFunctionValue[1] = EEPROM.read(ch2MultiFunction);
-  mMultiFunctionValue[2] = EEPROM.read(ch3MultiFunction);
-  mMultiFunctionValue[3] = EEPROM.read(ch4MultiFunction);
+  mFadeSpeed[0] = EEPROM.read(ch1FadeSpeed);
+  mFadeSpeed[1] = EEPROM.read(ch2FadeSpeed);
+  mFadeSpeed[2] = EEPROM.read(ch3FadeSpeed);
+  mFadeSpeed[3] = EEPROM.read(ch4FadeSpeed);
+
+  mBlinkOnTime[0] = EEPROM.read(ch1BlinkOnTime);
+  mBlinkOnTime[1] = EEPROM.read(ch2BlinkOnTime);
+  mBlinkOnTime[2] = EEPROM.read(ch3BlinkOnTime);
+  mBlinkOnTime[3] = EEPROM.read(ch4BlinkOnTime);
+
+  mBlinkOffTime[0] = EEPROM.read(ch1BlinkOffTime);
+  mBlinkOffTime[1] = EEPROM.read(ch2BlinkOffTime);
+  mBlinkOffTime[2] = EEPROM.read(ch3BlinkOffTime);
+  mBlinkOffTime[3] = EEPROM.read(ch4BlinkOffTime);
 }
 
 void OutputController::update(Direction direction, uint8_t speed, uint32_t functions) {
@@ -140,6 +159,9 @@ void OutputController::run() {
           blink(channel, &nextEvent[channel]);
         }
         break;
+      case NEON:
+        neon(channel, &nextEvent[channel]);
+        break;
     }
   }
 }
@@ -160,6 +182,9 @@ void OutputController::switchOn(uint8_t channel) {
         //pwmValues[channel] = 0;
         mChannelPinState[channel] = ON;
         break;
+      case NEON:
+        mChannelPinState[channel] = TRANSITION_ON;
+        break;
     }
   }
 }
@@ -178,6 +203,11 @@ void OutputController::switchOff(uint8_t channel) {
         pwmValues[channel] = 0;
         mChannelPinState[channel] = OFF;
         break;
+      case NEON:
+        pwmValues[channel] = 0;
+        mMode[channel] = NEON; // gets set to "FADE" during neon-startup
+        mChannelPinState[channel] = OFF;
+        break;
     }
   }
 }
@@ -190,7 +220,7 @@ void OutputController::fade(uint8_t channel, uint16_t* nextEvent) {
     State nextState = (dir > 0) ? ON : OFF;
 
     if(rtcOverflowCounter == *nextEvent) {
-      *nextEvent += mMultiFunctionValue[channel];
+      *nextEvent += mFadeSpeed[channel];
       pwmValues[channel] += dir;
       if (pwmValues[channel] == target){
         mChannelPinState[channel] = nextState;
@@ -200,11 +230,60 @@ void OutputController::fade(uint8_t channel, uint16_t* nextEvent) {
 }
 
 void OutputController::blink(uint8_t channel, uint16_t* nextEvent) {
-  //static uint8_t nextEvent[NUM_CHANNELS] = {0};
+  bool isOn = (bool)pwmValues[channel];
+  uint8_t waitTime = isOn ? mBlinkOffTime[channel] : mBlinkOnTime[channel];
+  uint8_t nextValue = isOn ? 0 : mDimmValue[channel]; 
+
   if(rtcOverflowCounter == *nextEvent) {
-    *nextEvent += 5*mMultiFunctionValue[channel];
-    pwmValues[channel] = (pwmValues[channel] == 0) ? mDimmValue[channel] : 0;
+    *nextEvent += 5*waitTime;
+    pwmValues[channel] = nextValue;
   }
+}
+
+enum TubeState{FLICKER, RAMP_UP};
+void OutputController::neon(uint8_t channel, uint16_t* nextEvent) {
+  // static uint8_t sCounter = 0;
+
+  // if (mChannelPinState[channel] == TRANSITION_ON) {
+  //   if(rtcOverflowCounter == *nextEvent) {
+  //     if(sCounter++ >= ((lfsr16_next() % 5) + 6)) {
+  //       pwmValues[channel] = mDimmValue[channel]/2;
+  //       mMultiFunctionValue[channel] = 30; // langsames faden
+  //       mMode[channel] = FADE;
+  //     }
+  //   }
+  // }
+
+
+  // static TubeState tubeState = FLICKER;
+  // static uint8_t sCounter = 0;
+  // uint8_t oldPwmValue[NUM_CHANNELS];
+  // oldPwmValue[channel] = pwmValues[channel];
+
+  // if (mChannelPinState[channel] == TRANSITION_ON) {
+  //   if(rtcOverflowCounter == *nextEvent) {
+  //     if(tubeState == FLICKER) {      
+  //       if(sCounter++ > ((lfsr16_next() % 5) + 6)) {  // random(6,11)
+  //         pwmValues[channel] = mDimmValue[channel];
+  //         *nextEvent += ((lfsr16_next() % 200) + 100);  // random(100,300)
+  //         tubeState = RAMP_UP;
+  //       }
+  //       else if(oldPwmValue[channel] == 0) {
+  //         pwmValues[channel] = mDimmValue[channel];
+  //         *nextEvent += ((lfsr16_next() % 70) + 30); // random(30,100)
+  //       }
+  //       else{
+  //         pwmValues[channel] = 0;
+  //         *nextEvent += ((lfsr16_next() % 150) + 50); // random(50,200)
+  //       }        
+  //     }
+  //     else if(tubeState == RAMP_UP) {
+  //       pwmValues[channel] = mDimmValue[channel]/2;
+  //       mMultiFunctionValue[channel] = 30; // langsames faden
+  //       mMode[channel] = FADE;
+  //     }
+  //   }
+  // }
 }
 
 ISR(TCA0_CMP0_vect) {

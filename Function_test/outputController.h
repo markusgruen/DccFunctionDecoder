@@ -39,12 +39,15 @@ class OutputController {
 
     void fade(uint8_t channel, uint16_t* nextEvent);
     void blink(uint8_t channel, uint16_t* nextEvent);
+    void neon(uint8_t channel, uint16_t* nextEvent);
 
     uint32_t mFunctions;
     uint32_t mFunctionMap[NUM_CHANNELS];
     uint8_t mSpeedThreshold[NUM_CHANNELS];
     uint8_t mDimmValue[NUM_CHANNELS];
-    uint8_t mMultiFunctionValue[NUM_CHANNELS];
+    uint8_t mFadeSpeed[NUM_CHANNELS];
+    uint8_t mBlinkOnTime[NUM_CHANNELS];
+    uint8_t mBlinkOffTime[NUM_CHANNELS];
     Mode mMode[NUM_CHANNELS];
     Direction mDirection = FORWARD;
 

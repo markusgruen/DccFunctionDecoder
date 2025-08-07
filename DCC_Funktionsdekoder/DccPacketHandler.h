@@ -21,19 +21,22 @@ class DccPacketHandler {
     Direction getDirection();
     uint8_t getSpeed();
     uint32_t getFunctions();
+    void resetCVsToDefault();
 
   private:
     void handleDccPacket();
     int16_t getAddressFromCV();
+    uint8_t getConsistAddressFromCV();
     int16_t getAddressFromDcc();
     Direction getDirectionFromDcc();
     uint8_t getSpeedFromDcc();
     uint32_t getFunctionsFromDcc();
     bool dccHasShortAddress();
-    void resetCVsToDefault();
+    
 
     bool mUpdate = false;
     int16_t mAddress = -1;
+    uint8_t mConsistAddress = 0;
     Direction mDirection = FORWARD;
     int8_t mSpeed = 0;
     uint32_t mFunctions = 0;

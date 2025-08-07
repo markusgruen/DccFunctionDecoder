@@ -20,7 +20,6 @@ constexpr uint8_t FILTER_THRESHOLD = (FILTER_LENGTH+1)/2;
 
 volatile uint8_t vBitstream[RINGBUF_SIZE];
 volatile uint8_t vNumReceivedBytes = 0;
-// volatile uint8_t vNumReceivedBits = 0;
 
 RingBuffer ringbuf;
 

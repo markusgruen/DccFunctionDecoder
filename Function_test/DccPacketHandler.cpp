@@ -17,6 +17,7 @@ void(* resetController) (void) = 0;
 void DccPacketHandler::begin(int pin, const CVDefaults* defaults, uint8_t numCVdefaults) {
   // read CVs
   mAddress = getAddressFromCV();
+  mConsistAddress = getConsistAddressFromCV();
   mDefaultCVPtr = defaults;
   mDefaultCVcount = numCVdefaults;
 
@@ -47,6 +48,8 @@ uint32_t DccPacketHandler::getFunctions(){
 }
 
 void DccPacketHandler::handleDccPacket() {
+  uint16_t dccAddress = getAddressFromDcc();
+  
   // write CV
   if(dccPacket[0] == 0x7c) {
     if(dccPacket[1] == 7 && dccPacket[2] == 8) { // CV8 = 8 means reset
@@ -58,7 +61,7 @@ void DccPacketHandler::handleDccPacket() {
     }
   }
   // standard packet
-  else if (getAddressFromDcc() == mAddress) {
+  else if (dccAddress == mAddress || dccAddress == mConsistAddress) {
     mDirection = getDirectionFromDcc();
     mSpeed = getSpeedFromDcc();
     mFunctions = getFunctionsFromDcc();
@@ -88,6 +91,10 @@ int16_t DccPacketHandler::getAddressFromCV() {
     }
   }
   return address;
+}
+
+uint8_t DccPacketHandler::getConsistAddressFromCV() {
+  return EEPROM.read(19) & 0b01111111;
 }
 
 int16_t DccPacketHandler::getAddressFromDcc() {

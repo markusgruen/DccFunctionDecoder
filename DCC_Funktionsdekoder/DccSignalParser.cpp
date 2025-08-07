@@ -23,10 +23,16 @@ void DccSignalParser::run() {
 
 void DccSignalParser::addBitsToBitstream() {
   uint8_t newBitstreamByte = 0;
+  uint64_t tempBitstream = 0;
   
   while(receiver.getNewBitstreamByte(&newBitstreamByte)) {
-    mBitstream |= (newBitstreamByte << 8);
+    tempBitstream = newBitstreamByte;
+    tempBitstream <<= mNumBits;
+    mBitstream |= tempBitstream;
     mNumBits += 8;
+
+    // mBitstream |= (newBitstreamByte << 8);
+    // mNumBits += 8;
   }
 }
 
