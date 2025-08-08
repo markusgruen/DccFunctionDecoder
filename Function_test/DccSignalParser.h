@@ -15,6 +15,23 @@ enum DccProtocolState{
   DCCPROTOCOL__ERROR
 };
 
+namespace DccSignalParser {
+    extern char dccPacket[DCC_MAX_BYTES];
+    extern uint8_t dccPacketSize;
+    extern bool newDccPacket;
+
+    void begin();
+    void run();
+    void addBitsToBitstream();
+    void resetBitstream();
+    void evaluateBitstream();
+    bool findPreamble();
+    int8_t getSeparator();
+    bool readDataByte();
+    bool checkErrorByteOK();
+    void saveDccPacket();
+}
+/*
 class DccSignalParser {
   public:
     DccSignalParser();
@@ -44,6 +61,6 @@ class DccSignalParser {
 
     DccProtocolState mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
 };
-
+*/
 
 #endif

@@ -4,7 +4,7 @@
 #include "debug_uart.h"
 
 OutputController outputController;
-DccPacketHandler dcc;
+// DccPacketHandler dcc;
 
 
 void setup() {

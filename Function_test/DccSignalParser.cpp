@@ -2,159 +2,174 @@
 #include "DccSignalReceiver_POLLING.h"
 
 
-DccSignalReceiver receiver;
 
+namespace DccSignalParser {
+  // extern variables 
+  // char dccPacket[];
+  // uint8_t dccPacketSize;
+  // bool newDccPacket;
 
-DccSignalParser::DccSignalParser() {
-}
+  // internal variables
+  uint64_t bitstream = 0;
+  uint8_t numBitsReceived = 0;
+  uint8_t packetByteCount = 0;
+  uint8_t numOnesInPreamble = 0;
+  uint8_t state = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
+  uint8_t byteStream[DCC_MAX_BYTES];
 
-void DccSignalParser::begin(char* dccPacket, uint8_t* packetSize, bool* newDccPacket){
-  mDccPacket = dccPacket;
-  mPacketSize = packetSize;
-  mNewDccPacket = newDccPacket;
-  
-  receiver.begin();
-}
+  // Functions
 
-void DccSignalParser::run() {
-  addBitsToBitstream();
-  evaluateBitstream();  
-}
-
-void DccSignalParser::addBitsToBitstream() {
-  uint8_t newBitstreamByte = 0;
-  uint64_t tempBitstream = 0;
-  
-  while(receiver.getNewBitstreamByte(&newBitstreamByte)) {
-    tempBitstream = newBitstreamByte;
-    tempBitstream <<= mNumBits;
-    mBitstream |= tempBitstream;
-    mNumBits += 8;
-
-    // mBitstream |= (newBitstreamByte << 8);
-    // mNumBits += 8;
+  void begin(){
+    DccSignalReceiver::begin();
   }
-}
 
-void DccSignalParser::resetBitstream(){
-  mBitstream = 0;
-  mNumBits = 0;
-  mByteCount = 0;
-  mNumOnesInPreamble = 0;
-  mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
-}
+  void run() {
+    addBitsToBitstream();
+    evaluateBitstream();  
+  }
 
-void DccSignalParser::evaluateBitstream() {
-  int separator = -1;
-  
-  switch(mState) {
-    case DCCPROTOCOL__WAIT_FOR_PREAMBLE:
-      if(findPreamble() == true){
-        mState = DCCPROTOCOL__READ_DATA_BYTE;
+  void addBitsToBitstream() { 
+    uint64_t tempBitstream = 0;
+
+    while(1){  // there is a return in here...
+      noInterrupts();
+        uint8_t head = DccSignalReceiver::ringbuf.head;
+        uint8_t tail = DccSignalReceiver::ringbuf.tail;
+      interrupts();
+
+      if (tail == head) {
+        return; // Buffer leer
       }
-      break;
 
-    case DCCPROTOCOL__READ_DATA_BYTE:
-      if(readDataByte() == true) {
-        mState = DCCPROTOCOL__WAIT_FOR_SEPARATOR;
-      }
-      break;
+      tempBitstream = DccSignalReceiver::ringbuf.buffer[tail++];
+      tempBitstream <<= numBitsReceived;
+      bitstream |= tempBitstream;
+      numBitsReceived += 8;
+      noInterrupts();
+        DccSignalReceiver::ringbuf.tail = (tail & RINGBUF_MASK);
+      interrupts();
+    }
+    return;
+  }
 
-    case DCCPROTOCOL__WAIT_FOR_SEPARATOR:
-      separator = getSeparator();
-      if(separator == 0) {
-        mState = DCCPROTOCOL__READ_DATA_BYTE;
-      } else if(separator == 1) {
-        mState = DCCPROTOCOL__PACKET_COMPLETE;
-      } else { // no separator received yet, do nothing
-      }
-      break;
+  void resetBitstream(){
+    bitstream = 0;
+    numBitsReceived = 0;
+    packetByteCount = 0;
+    numOnesInPreamble = 0;
+    state = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
+  }
 
-    case DCCPROTOCOL__PACKET_COMPLETE:
-      // TODO: evaluate checksum
-      break;
+  void evaluateBitstream() {
+    int separator = -1;
+    
+    switch(state) {
+      case DCCPROTOCOL__WAIT_FOR_PREAMBLE:
+        if(findPreamble() == true){
+          state = DCCPROTOCOL__READ_DATA_BYTE;
+        }
+        break;
 
-    case DCCPROTOCOL__PACKET_VALID:
-      if(checkErrorByteOK()) {
-        saveDccPacket();
-        mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
+      case DCCPROTOCOL__READ_DATA_BYTE:
+        if(readDataByte() == true) {
+          state = DCCPROTOCOL__WAIT_FOR_SEPARATOR;
+        }
+        break;
+
+      case DCCPROTOCOL__WAIT_FOR_SEPARATOR:
+        separator = getSeparator();
+        if(separator == 0) {
+          state = DCCPROTOCOL__READ_DATA_BYTE;
+        } else if(separator == 1) {
+          state = DCCPROTOCOL__PACKET_COMPLETE;
+        } else { // no separator received yet, do nothing
+        }
+        break;
+
+      case DCCPROTOCOL__PACKET_COMPLETE:
+        // TODO: evaluate checksum
+        break;
+
+      case DCCPROTOCOL__PACKET_VALID:
+        if(checkErrorByteOK()) {
+          saveDccPacket();
+          state = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
+        }
+        else {
+          state = DCCPROTOCOL__ERROR;
+        }
+        break;
+
+      case DCCPROTOCOL__ERROR:
+        resetBitstream();
+        state = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
+        break;
+    }
+  }
+
+  bool findPreamble() {
+    bool bit = 0;
+    
+    while(numBitsReceived > 0) {
+      bit = (bitstream & 0b1);
+      bitstream >>= 1;
+      numBitsReceived--;
+
+      if(bit == 1) {
+        numOnesInPreamble++;
       }
       else {
-        mState = DCCPROTOCOL__ERROR;
+        if(numOnesInPreamble >= 10) {
+          // zero was found and >= 10 ones before this zero
+          numOnesInPreamble = 0;
+          return true;
+        }
+        else {
+          // zero was found but not enough ones
+          numOnesInPreamble = 0;
+        }
       }
-      break;
-
-    case DCCPROTOCOL__ERROR:
-      resetBitstream();
-      mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
-      break;
-  }
-}
-
-bool DccSignalParser::findPreamble() {
-  bool bit = 0;
-  
-  while(mNumBits > 0) {
-    bit =(mBitstream & 0b1);
-    mBitstream >>= 1;
-    mNumBits--;
-
-    if(bit == 1) {
-      mNumOnesInPreamble++;
     }
-    else {
-      if(mNumOnesInPreamble >= 10) {
-        // zero was found and >= 10 ones before this zero
-        mNumOnesInPreamble = 0;
+    return false;
+  }
+
+  int8_t getSeparator() {
+      
+    int8_t separator = -1;
+    if(numBitsReceived >= 1) {
+      separator = (bitstream & 0b1);
+      bitstream >>= 1;
+      numBitsReceived--;
+    }
+    return separator;
+  }
+
+  bool readDataByte() {
+    if(numBitsReceived >= 8){
+      if(packetByteCount < DCC_MAX_BYTES) {
+        byteStream[packetByteCount++] = (bitstream & 0xFF);
+        bitstream >>= 8;
+        numBitsReceived -= 8;
         return true;
       }
       else {
-        // zero was found but not enough ones
-        mNumOnesInPreamble = 0;
+          resetBitstream();
       }
     }
+    return false;
   }
-  return false;
-}
 
-int8_t DccSignalParser::getSeparator() {
-    
-  int8_t separator = -1;
-  if(mNumBits >= 1) {
-    separator = (mBitstream & 0b1);
-    mBitstream >>= 1;
-    mNumBits--;
-  }
-  return separator;
-}
-
-bool DccSignalParser::readDataByte() {
-  if(mNumBits >= 8){
-    if(mByteCount < DCC_MAX_BYTES) {
-      mByteStream[mByteCount++] = (mBitstream & 0xFF);
-      mBitstream >>= 8;
-      mNumBits -= 8;
-      return true;
+  bool checkErrorByteOK() {
+    uint8_t errorByte = 0;
+    for(uint8_t i=0; i<(packetByteCount-1); i++) {
+      errorByte ^= byteStream[i];
     }
-    else {
-        resetBitstream();
-    }
+    return (errorByte == byteStream[packetByteCount]);
   }
-  return false;
-}
 
-bool DccSignalParser::checkErrorByteOK() {
-  uint8_t errorByte = 0;
-  for(uint8_t i=0; i<(mByteCount-1); i++) {
-    errorByte ^= mByteStream[i];
+  void saveDccPacket() {
+    memcpy(dccPacket, byteStream, packetByteCount-1);  // -1, because last byte is error-byte
+    dccPacketSize = packetByteCount-1;
+    newDccPacket = true;
   }
-  return (errorByte == mByteStream[mByteCount]);
 }
-
-void DccSignalParser::saveDccPacket() {
-  memcpy(mDccPacket, mByteStream, mByteCount-1);  // -1, because last byte is error-byte
-  *mPacketSize = mByteCount-1;
-  *mNewDccPacket = true;
-}
-
-
