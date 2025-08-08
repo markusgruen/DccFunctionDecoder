@@ -1,5 +1,5 @@
 #ifndef DCCSIGNALRECEIVER_POLLING_H
-#define DCCSGNALRECEIVER_POLLING_H
+#define DCCSIGNALRECEIVER_POLLING_H
 
 #include <Arduino.h>
 
@@ -18,6 +18,14 @@ typedef struct {
 } RingBuffer;
 
 
+namespace DccSignalReceiver {
+    extern RingBuffer ringbuf;
+
+    void begin();
+    //bool getNewBitstreamByte(uint8_t* bitstreamByte);
+}
+
+/*
 class DccSignalReceiver {
   public:
     DccSignalReceiver();
@@ -26,5 +34,6 @@ class DccSignalReceiver {
 
     // static volatile uint8_t mDccPinMask;
 };
+*/
 
 #endif

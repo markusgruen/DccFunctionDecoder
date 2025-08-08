@@ -2,7 +2,7 @@
 #include "outputController.h"
 #include "CV_default_values.h"
 
-DccPacketHandler dcc;
+//DccPacketHandler dcc;
 OutputController outputController;
 
 
@@ -19,16 +19,17 @@ OutputController outputController;
 // - alle pins fest vergeben und nicht parametrierbar machen
 
 void setup() {
-  dcc.begin(defaultCVs, numDefaultCVs);
+  DccPacketHandler::begin();
   outputController.begin();
   outputController.readCVs();
 }
 
 void loop() {
   
-  dcc.run();
-  if(dcc.hasUpdate()) {
-    outputController.update(dcc.getDirection(), dcc.getSpeed(), dcc.getFunctions());
+  DccPacketHandler::run();
+  if(DccPacketHandler::hasUpdate) {
+    DccPacketHandler::hasUpdate = false;
+    outputController.update(DccPacketHandler::direction, DccPacketHandler::speed, DccPacketHandler::functions);
   }
   outputController.run();
 }
