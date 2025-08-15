@@ -26,7 +26,7 @@ namespace DccSignalParser {
     void resetBitstream();
     void evaluateBitstream();
     bool findPreamble();
-    int8_t getSeparator();
+    uint8_t getSeparator();
     bool readDataByte();
     bool checkErrorByteOK();
     void saveDccPacket();

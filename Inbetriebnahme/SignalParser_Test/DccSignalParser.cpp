@@ -4,6 +4,10 @@
 #include "debug_uart.h"
 
 
+constexpr uint64_t FIRST_BIT_MASK = (1ULL << 63);
+constexpr uint64_t FIRST_BYTE_MASK = (0xFFULL << 56);
+
+
 namespace DccSignalParser {
   // extern variables 
   char dccPacket[];
@@ -43,7 +47,7 @@ namespace DccSignalParser {
       }
 
       tempBitstream = DccSignalReceiver::ringbuf.buffer[tail++];
-      tempBitstream <<= numBitsReceived;
+      tempBitstream <<= (56-numBitsReceived);
       bitstream |= tempBitstream;
       numBitsReceived += 8;
       noInterrupts();
@@ -62,21 +66,19 @@ namespace DccSignalParser {
   }
 
   void evaluateBitstream() {
-    int separator = -1;
+    bool separator = 0;
     
     switch(state) {
       case DCCPROTOCOL__WAIT_FOR_PREAMBLE:
-        if(findPreamble() == true){
+        if(findPreamble()){
           PORTA.OUTSET = CH1_PIN;
           state = DCCPROTOCOL__READ_DATA_BYTE;
         }
         break;
 
       case DCCPROTOCOL__READ_DATA_BYTE:
-        if(readDataByte() == true) {
-          if(byteStream[0] == 0xC0){
-            PORTA.OUTCLR = CH1_PIN;
-          }
+        if(readDataByte()) {
+          PORTA.OUTCLR = CH1_PIN;
           state = DCCPROTOCOL__WAIT_FOR_SEPARATOR;
         }
         break;
@@ -84,11 +86,11 @@ namespace DccSignalParser {
       case DCCPROTOCOL__WAIT_FOR_SEPARATOR:
         separator = getSeparator();
         if(separator == 0) {
-          // PORTA.OUTTGL = CH1_PIN;
           state = DCCPROTOCOL__READ_DATA_BYTE;
+          PORTA.OUTSET = CH1_PIN;
         } else if(separator == 1) {
-          state = DCCPROTOCOL__PACKET_COMPLETE;
-          // PORTA.OUTCLR = CH1_PIN;
+          // state = DCCPROTOCOL__PACKET_COMPLETE;
+          state = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
         } else { // no separator received yet, do nothing
         }
         break;
@@ -96,12 +98,10 @@ namespace DccSignalParser {
       case DCCPROTOCOL__PACKET_COMPLETE:
         if(checkErrorByteOK()) {
           saveDccPacket();
-          // PORTA.OUTCLR = CH1_PIN;
           state = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
         }
         else {
-          // PORTA.OUTCLR = CH1_PIN;
-          state = DCCPROTOCOL__ERROR;
+          // state = DCCPROTOCOL__ERROR;
         }
         break;
 
@@ -119,8 +119,8 @@ namespace DccSignalParser {
     bool bit = 0;
     
     while(numBitsReceived > 0) {
-      bit = bitstream & 0x01;
-      bitstream >>= 1;
+      bit = bitstream & FIRST_BIT_MASK;
+      bitstream <<= 1;
       numBitsReceived--;
 
       if(bit) {
@@ -141,22 +141,23 @@ namespace DccSignalParser {
     return false;
   }
 
-  int8_t getSeparator() {
-      
-    int8_t separator = -1;
+  uint8_t getSeparator() {  
+    bool separator = 0;
+
     if(numBitsReceived >= 1) {
-      separator = (bitstream & 0b1);
-      bitstream >>= 1;
+      separator = bitstream & FIRST_BIT_MASK;
+      bitstream <<= 1;
       numBitsReceived--;
     }
-    return separator;
+    return (uint8_t)separator;
   }
 
   bool readDataByte() {
     if(numBitsReceived >= 8){
       if(packetByteCount < DCC_MAX_BYTES) {
-        byteStream[packetByteCount++] = (bitstream & 0xFF);
-        bitstream >>= 8;
+        uint8_t* p = (uint8_t*)&bitstream;  // p ist ein pointer zu einem uint8_t array
+        byteStream[packetByteCount++] = p[7];  // Linkestes Byte
+        bitstream <<= 8;
         numBitsReceived -= 8;
         return true;
       }

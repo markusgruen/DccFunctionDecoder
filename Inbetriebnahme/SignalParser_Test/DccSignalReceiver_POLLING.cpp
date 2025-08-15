@@ -54,7 +54,7 @@ ISR(TCA0_CMP0_vect) {
   static uint8_t sLastHalfBit = 0xFF;
   
   static uint8_t sBitstreamByte = 0;
-  static uint8_t sBitCount = 0;
+  static uint8_t sBitCount = 8;
   
   
   // Pegel messen
@@ -86,14 +86,14 @@ ISR(TCA0_CMP0_vect) {
     else {
       // if this is the second half-bit
       if (thisHalfBit == sLastHalfBit) {
-        sBitstreamByte |= (thisHalfBit << sBitCount++);        
+        sBitstreamByte |= (thisHalfBit << --sBitCount);        
 
         // save byte to ringbuffer if 8 bits have been received
-        if(sBitCount == 8) {
+        if(sBitCount == 0) {
           uint8_t head = ringbuf.head; // read volatile ringbuf.head only once!
           ringbuf.buffer[head++] = sBitstreamByte;
           ringbuf.head = (head & RINGBUF_MASK);
-          sBitCount = 0;
+          sBitCount = 8;
           sBitstreamByte = 0;  // ja, muss zurückgesetzt werden!
         }
       }
