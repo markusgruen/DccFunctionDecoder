@@ -11,7 +11,7 @@ enum DccProtocolState{
   DCCPROTOCOL__READ_DATA_BYTE,      // Lese 8 Datenbits
   DCCPROTOCOL__WAIT_FOR_SEPARATOR,  // Warte auf das Startbit (0) oder Stopbit (1)
   DCCPROTOCOL__PACKET_COMPLETE,     // Alle Bits eines Pakets vollständig empfangen
-  DCCPROTOCOL__PACKET_VALID,        // Errorbyte wurde erfolgreich geprüft
+  // DCCPROTOCOL__PACKET_VALID,        // Errorbyte wurde erfolgreich geprüft
   DCCPROTOCOL__ERROR
 };
 
@@ -26,7 +26,7 @@ namespace DccSignalParser {
     void resetBitstream();
     void evaluateBitstream();
     bool findPreamble();
-    uint8_t getSeparator();
+    int8_t getSeparator();
     bool readDataByte();
     bool checkErrorByteOK();
     void saveDccPacket();
