@@ -44,25 +44,25 @@ namespace DccPacketHandler {
     // only write CVs when this is the "real" address
     if((dccAddress == address)) {
 
-      // check if correct CV-write command has been received
+      // write CVs 
       if((dccPacket[1+addressShift] & 0b11111100) == 0b11101100){  // if "write Byte to CV"
-
-        // confirm that two consecutive CV-write commands have been received 
-        if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {
-
-          // Decoder reset?
-          if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) {
+        if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
+          if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
             resetCVsToDefault();
+
             for(uint8_t i=0; i<50; i++) {
               confirmCvWrite();
             }
+
             resetController();
           }
           else {
             EEPROM.update(dccPacket[2+addressShift]+1, dccPacket[3+addressShift]); // [1] = address; [2] = value;
             confirmCvWrite();
-            getAddressFromCV();           
-          }
+            if(dccPacket[2+addressShift]+1 == 29) {  // update address if CV 29 was written
+              getAddressFromCV();           
+            }
+          }   
         }
 
         lastDccErrorByte = dccPacket[dccPacketSize-1];
@@ -187,12 +187,6 @@ namespace DccPacketHandler {
 
     return dccFunctions;
   }
-
-  // bool DccPacketHandler::hasUpdate() {
-  //   bool hasUpdate = mUpdate;
-  //   mUpdate = false;
-  //   return update;
-  // }
 
   inline bool dccIsShortAddress(){
     return bit_is_clear(dccPacket[0], 7);
