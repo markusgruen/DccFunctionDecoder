@@ -26,14 +26,13 @@ namespace OutputController {
   // void update(Direction direction, uint8_t speed, uint32_t functions);
   void run();  
   void update(Direction direction, uint8_t speed, uint32_t functions);
-  void switchOn(uint8_t channel);
-  void switchOff(uint8_t channel);
 
-  bool fade_in(uint8_t channel, uint16_t* nextEvent);
-  bool fade_out(uint8_t channel, uint16_t* nextEvent);
+  // bool fade_in(uint8_t channel, uint16_t* nextEvent);
+  // bool fade_out(uint8_t channel, uint16_t* nextEvent);
+  bool fade(uint8_t channel, uint16_t* nextEvent, bool up);
   void blink(uint8_t channel, uint16_t* nextEvent);
   void neon(uint8_t channel, uint16_t* nextEvent);
-  void wait(uint8_t channel, uint16_t* nextEvent, bool isOn);
+  bool wait(uint8_t channel, uint16_t* nextEvent);
 
   bool isChannelOn(uint32_t functions, uint8_t channel);
   bool directionMatchesConfig(uint8_t channel, Direction direction);

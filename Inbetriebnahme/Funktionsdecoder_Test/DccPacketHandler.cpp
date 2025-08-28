@@ -189,7 +189,7 @@ namespace DccPacketHandler {
     //  DER FOLGENDE CODE KOSTET EEPROM-SCHREIBZYKLEN
     //  DAFÜR SPART ER FLASH
     // 
-    for (uint16_t i = 0; i < E2END + 1; i++) {  // E2END = letzte EEPROM-Adresse
+    for (uint16_t i = 0; i < EEPROM_SIZE + 1; i++) {  // E2END = letzte EEPROM-Adresse
         eeprom_write_byte((uint8_t*)i, 0);
     }
     for(uint8_t i=0; i<numDefaultCVs; i++){
@@ -200,11 +200,11 @@ namespace DccPacketHandler {
   }
 
   void confirmCvWrite() {
-    PORTA.OUTCLR = CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN;
+    PORTA.OUTCLR = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
     for(uint16_t i=0; i<0xFFFF; i++) {
       __asm__ __volatile__("nop");
     }
-    PORTA.OUTSET = CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN;
+    PORTA.OUTSET = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
   }
 
 };

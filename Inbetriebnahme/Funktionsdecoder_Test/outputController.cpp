@@ -5,6 +5,10 @@
 
 
 uint16_t getPseudoRandomNumber();
+uint8_t myRandomNumber(uint8_t min, uint8_t max);
+
+#define FADE_IN 1
+#define FADE_OUT 0
 
 
 // Volatile variables
@@ -13,21 +17,34 @@ volatile uint16_t vRtcOverflowCounter;
 
 // Global variables
 const uint8_t channelPin_bm[NUM_CHANNELS] = {CH1_PIN, CH2_PIN, CH3_PIN, CH4_PIN};
-uint8_t flackerCount;
+uint8_t flackerCount[NUM_CHANNELS];
 
 
 namespace OutputController{
   // Local variables
-  uint32_t functionMap[NUM_CHANNELS];
+  // uint32_t functionMap[NUM_CHANNELS] = {0b00000010, 0b00000100, 0b00001000, 0b00010000};
+  // uint8_t dimmValue[NUM_CHANNELS] = {127, 127, 127, 127};
+  // uint8_t fadeSpeed[NUM_CHANNELS] = {0, 50, 50, 50};
+  // uint8_t blinkOnTime[NUM_CHANNELS] = {2, 50, 50, 50};
+  // uint8_t blinkOffTime[NUM_CHANNELS] = {200, 150, 150, 150};
+  // Mode mode[NUM_CHANNELS] = {BLINK, FADE, FADE, FADE};
+  // Direction direction = FORWARD;
+  // State channelPinState[4] = {OFF, OFF, OFF, OFF};  
+  uint32_t functionMap[NUM_CHANNELS] = {0b00000010, 0b00000100, 0b00001000, 0b00010000};
   uint8_t dimmValue[NUM_CHANNELS] = {127, 127, 127, 127};
-  uint8_t fadeSpeed[NUM_CHANNELS] = {50, 50, 50, 50};
-  uint8_t blinkOnTime[NUM_CHANNELS] = {50, 50, 50, 50};
-  uint8_t blinkOffTime[NUM_CHANNELS] = {150, 150, 150, 150};
-  Mode mode[NUM_CHANNELS] = {BLINK, BLINK, BLINK, BLINK};
+  uint8_t fadeSpeed[NUM_CHANNELS] = {0, 50, 50, 50};
+  uint8_t blinkOnTime[NUM_CHANNELS] = {2, 50, 50, 50};
+  uint8_t blinkOffTime[NUM_CHANNELS] = {200, 150, 150, 150};
+  Mode mode[NUM_CHANNELS] = {BLINK, FADE, FADE, FADE};
   Direction direction = FORWARD;
-  State channelPinState[4] = {OFF, OFF, OFF, OFF};  
+  State channelPinState[4] = {OFF, OFF, OFF, OFF};
 
   void begin(){
+    // configure output pins
+    PORTA.DIRSET = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
+    PORTA.OUTSET = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
+
+
     // setup Timer A for software-PWM with >100Hz frequency at 8bit resolution
     // 20 MHz / 8 = 2.5 MHz → 1 Takt = 0.4 µs → 30 µs = 75 Takte
 
@@ -43,15 +60,10 @@ namespace OutputController{
     // setup RTC for 10 ms Interrupt
     // RTC.CTRLA = 0;                                      // stop RTC
     // RTC.CLKSEL = RTC_CLKSEL_INT32K_gc;                  // select 32.768 Osc. as source  // <-- default 
-    RTC.PER = 33;                                      // period = 163 ticks ~= 5 ms
+    RTC.PER = 15;                                      // period = 163 ticks ~= 5 ms
     //RTC.INTFLAGS = RTC_OVF_bm;                          // clear Overflow flag
     RTC.INTCTRL = RTC_OVF_bm;                           // activate overflow interrupt
     RTC.CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;   // Prescaler 1, start RTC
-
-    // configure output pins
-
-    PORTA.DIRSET = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
-    PORTA.OUTSET = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
   }
 
   void readCVs() {
@@ -77,8 +89,13 @@ namespace OutputController{
       if(channelIsOn && directionMatches) {
         vPwmValue[channel] = 0;
         channelPinState[channel] = TRANSITION_ON;
-      } else {
-        channelPinState[channel] = TRANSITION_OFF;
+        flackerCount[channel] = 0;
+        
+      } 
+      else {
+        if(channelPinState[channel] == ON || channelPinState[channel] == TRANSITION_ON) {
+          channelPinState[channel] = TRANSITION_OFF;
+        }
       }
     }
   }
@@ -90,10 +107,15 @@ namespace OutputController{
       switch(mode[channel]) {
         case FADE:
           if(channelPinState[channel] == TRANSITION_ON) {
-            fade_in(channel, &nextEvent[channel]);
+            // if(fade_in(channel, &nextEvent[channel])){
+            if(fade(channel, &nextEvent[channel], FADE_IN)) {
+              channelPinState[channel] = ON;
+            }
           }
           if(channelPinState[channel] == TRANSITION_OFF) {
-            fade_out(channel, &nextEvent[channel]);
+            if(fade(channel, &nextEvent[channel], FADE_OUT)) {
+              channelPinState[channel] = OFF;
+            }
           }
           break;
         case BLINK:
@@ -106,55 +128,15 @@ namespace OutputController{
     }
   }
 
-  // void switchOn(uint8_t channel) {
 
-  //   if(channelPinState[channel] == OFF || channelPinState[channel] == TRANSITION_OFF) {
-  //     switch(mode[channel]) {
-  //       case ONOFF:
-  //         vPwmValue[channel] = dimmValue[channel];
-  //         channelPinState[channel] = ON;  
-  //         break;
-  //       case FADE:
-  //         //vPwmValue[channel] = 0;
-  //         channelPinState[channel] = TRANSITION_ON;
-  //         break;
-  //       case BLINK:
-  //         //vPwmValue[channel] = 0;
-  //         // channelPinState[channel] = ON;
-  //         channelPinState[channel] = TRANSITION_ON;
-  //         break;
-  //       case NEON:
-  //         channelPinState[channel] = TRANSITION_ON;
-  //         break;
-  //     }
-  //   }
-  // }
+  bool fade(uint8_t channel, uint16_t* nextEvent, bool up) {
+    uint8_t targetDimmValue = up ? dimmValue[channel] : 0;
 
-  // void switchOff(uint8_t channel) {
-  //   if(channelPinState[channel] == ON || channelPinState[channel] == TRANSITION_ON) {
-  //     switch(mode[channel]) {
-  //       case ONOFF:
-  //         vPwmValue[channel] = 0;
-  //         channelPinState[channel] = OFF;  
-  //         break;
-  //       case FADE:
-  //         channelPinState[channel] = TRANSITION_OFF;
-  //         break;
-  //       case BLINK:
-  //         vPwmValue[channel] = 0;
-  //         channelPinState[channel] = OFF;
-  //         break;
-  //       case NEON:
-  //         vPwmValue[channel] = 0;
-  //         mode[channel] = NEON; // gets set to "FADE" during neon-startup
-  //         channelPinState[channel] = OFF;
-  //         break;
-  //     }
-  //   }
-  // }
-
-  bool fade_in(uint8_t channel, uint16_t* nextEvent) {
-    if (channelPinState[channel] == TRANSITION_ON) {
+    if(fadeSpeed[channel] == 0) {
+      vPwmValue[channel] = targetDimmValue;
+      return true;
+    }
+    else {
       cli();
       __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
       uint16_t overflowCounter = vRtcOverflowCounter;
@@ -163,63 +145,97 @@ namespace OutputController{
 
       if(overflowCounter == *nextEvent) {
         *nextEvent += fadeSpeed[channel];
-        vPwmValue[channel]++;
-        if (vPwmValue[channel] == dimmValue[channel]){
-          channelPinState[channel] = ON;
+        up ? vPwmValue[channel]++ : vPwmValue[channel]--;
+        if (vPwmValue[channel] == targetDimmValue){
           return true;
         }
       }
     }
     return false;
+
+
   }
 
-  bool fade_out(uint8_t channel, uint16_t* nextEvent) {
-    if (channelPinState[channel] == TRANSITION_OFF) {
-      cli();
-      __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-      uint16_t overflowCounter = vRtcOverflowCounter;
-      __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-      sei();
+  // bool fade_in(uint8_t channel, uint16_t* nextEvent) {
+  //   if(fadeSpeed[channel] == 0) {
+  //     vPwmValue[channel] = dimmValue[channel];
+  //     return true;
+  //   }
+  //   else {
+  //     cli();
+  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+  //     uint16_t overflowCounter = vRtcOverflowCounter;
+  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+  //     sei();
 
-      if(overflowCounter == *nextEvent) {
-        *nextEvent += fadeSpeed[channel];
-        vPwmValue[channel]--;
-        if (vPwmValue[channel] == 0){
-          channelPinState[channel] = OFF;
-          return true;
-        }
-      }
-    }
-    return false;
-  }
+  //     if(overflowCounter == *nextEvent) {
+  //       *nextEvent += fadeSpeed[channel];
+  //       vPwmValue[channel]++;
+  //       if (vPwmValue[channel] == dimmValue[channel]){
+  //         return true;
+  //       }
+  //     }
+  //   }
+  //   return false;
+  // }
 
+  // bool fade_out(uint8_t channel, uint16_t* nextEvent) {
+  //   if(fadeSpeed[channel] == 0) {
+  //     vPwmValue[channel] = 0;
+  //     return true;
+  //   }
+  //   else {
+  //     cli();
+  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+  //     uint16_t overflowCounter = vRtcOverflowCounter;
+  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+  //     sei();
 
+  //     if(overflowCounter == *nextEvent) {
+  //       *nextEvent += fadeSpeed[channel];
+  //       vPwmValue[channel]--;
+  //       if (vPwmValue[channel] == 0){
+  //         return true;
+  //       }
+  //     }
+  //   }
+  //   return false;
+  // }
+
+  enum BlinkState{BLINK_FADE_IN, BLINK_ON, BLINK_FADE_OUT, BLINK_OFF};
   void blink(uint8_t channel, uint16_t* nextEvent) {
-    switch (channelPinState[channel]) {
-      case TRANSITION_ON:
-        fade_in(channel, nextEvent);
-        // if(fade_in(channel, nextEvent)) {
-        //   *nextEvent += 10*blinkOnTime[channel];
-        // }
-        break;
-      case ON:
-        // wait(channel, nextEvent, 1);
-        break;
-      case TRANSITION_OFF:
-        // if(fade_out(channel, nextEvent)) {
-        //   *nextEvent += 10*blinkOffTime[channel];
-        //   vPwmValue[channel] = 0;
-        // }
-        break;
-      case OFF:
-        // wait(channel, nextEvent, 0);
-        break;
+    static BlinkState blinkState[NUM_CHANNELS] = {BLINK_FADE_IN, BLINK_FADE_IN, BLINK_FADE_IN, BLINK_FADE_IN};
+
+    if(channelPinState[channel] == TRANSITION_ON) {
+      switch(blinkState[channel]) {
+        case BLINK_FADE_IN:
+          if(fade(channel, nextEvent, FADE_IN)) {
+            *nextEvent += 10*blinkOnTime[channel];
+            blinkState[channel] = BLINK_ON;
+          }
+          break;
+        case BLINK_ON:
+          if(wait(channel, nextEvent)) {
+            blinkState[channel] = BLINK_FADE_OUT;
+          }
+          break;
+        case BLINK_FADE_OUT:
+          if(fade(channel, nextEvent, FADE_OUT)) {
+            *nextEvent += 10*blinkOffTime[channel];
+            blinkState[channel] = BLINK_OFF;
+          }
+          break;
+        case BLINK_OFF:
+          if(wait(channel, nextEvent)) {
+            blinkState[channel] = BLINK_FADE_IN;
+            flackerCount[channel]++;
+          }
+          break;
+      }
     }
   }
 
-  void wait(uint8_t channel, uint16_t* nextEvent, bool isOn){
-    State nextState = isOn ? TRANSITION_OFF : TRANSITION_ON;
-
+  bool wait(uint8_t channel, uint16_t* nextEvent){
     cli();
     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
     uint16_t overflowCounter = vRtcOverflowCounter;
@@ -227,82 +243,33 @@ namespace OutputController{
     sei();
 
     if(overflowCounter == *nextEvent) {
-      channelPinState[channel] = nextState;
-      // flackerCount++;
+      return true;
     }
+    return false;
   }
-
-
-
-  //   bool isOn = (bool)vPwmValue[channel];
-  //   uint8_t waitTime = isOn ? blinkOffTime[channel] : blinkOnTime[channel];
-  //   uint8_t nextValue = isOn ? 0 : dimmValue[channel]; 
-
-  //   cli();
-  //   __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-  //   uint16_t overflowCounter = vRtcOverflowCounter;
-  //   __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-  //   sei();
-
-  //   if(overflowCounter == *nextEvent) {
-  //     *nextEvent += 10*waitTime;
-  //     vPwmValue[channel] = nextValue;
-  //     flackerCount++;
-  //   }
-  // }
 
   enum TubeState{FLICKER, RAMP_UP};
   void neon(uint8_t channel, uint16_t* nextEvent) {
     static TubeState tubeState = FLICKER;
-    blinkOnTime[channel] = 1;
+    blinkOnTime[channel] = 2;
+    fadeSpeed[channel] = 0;
 
     if (channelPinState[channel] == TRANSITION_ON) {
-      if(tubeState == FLICKER){
-        if(flackerCount <= ((getPseudoRandomNumber() % 6) + 8)) {  // random(6,11)
-          blinkOffTime[channel] = ((getPseudoRandomNumber() % 80) + 20); // random(100,300)
+      if(tubeState == FLICKER) {
+        if(flackerCount[channel] <= myRandomNumber(4, 20)) {  // random(8,13)
+          blinkOffTime[channel] = myRandomNumber(32,160); // random(100,300)
           blink(channel, nextEvent);
         }
         else {
           tubeState = RAMP_UP;
         }
       }
-      else {
+      else { // tubestate == RAMP_UP
         vPwmValue[channel] = dimmValue[channel]/16;
         fadeSpeed[channel] = 150; // langsames faden
         mode[channel] = FADE;
       }
     }
-
-
-    // static TubeState tubeState = FLICKER;
-    // static uint8_t sCounter = 0;
-    // uint8_t oldvPwmValue[NUM_CHANNELS];
-    // oldvPwmValue[channel] = vPwmValue[channel];
-
-    // if (mChannelPinState[channel] == TRANSITION_ON) {
-    //   if(vRtcOverflowCounter == *nextEvent) {
-    //     if(tubeState == FLICKER) {      
-    //       if(sCounter++ > ((getPseudoRandomNumber() % 5) + 6)) {  // random(6,11)
-    //         vPwmValue[channel] = mDimmValue[channel];
-    //         *nextEvent += ((getPseudoRandomNumber() % 200) + 100);  // random(100,300)
-    //         tubeState = RAMP_UP;
-    //       }
-    //       else if(oldvPwmValue[channel] == 0) {
-    //         vPwmValue[channel] = mDimmValue[channel];
-    //         *nextEvent += ((getPseudoRandomNumber() % 70) + 30); // random(30,100)
-    //       }
-    //       else{
-    //         vPwmValue[channel] = 0;
-    //         *nextEvent += ((getPseudoRandomNumber() % 150) + 50); // random(50,200)
-    //       }        
-    //     }
-    //     else if(tubeState == RAMP_UP) {
-    //       vPwmValue[channel] = mDimmValue[channel]/2;
-    //       mMultiFunctionValue[channel] = 30; // langsames faden
-    //       mMode[channel] = FADE;
-    //     }
-    //   }
-    // }
   }
 
   bool forwardOnly(uint8_t channel) {
@@ -334,23 +301,33 @@ uint16_t getPseudoRandomNumber() {
   return lfsr16;
 }
 
+uint8_t myRandomNumber(uint8_t min, uint8_t max){
+  return (getPseudoRandomNumber() % (max - min)) + min;
+}
+
 
 ISR(TCB0_INT_vect) {
   static uint8_t sPwmCounter = 0;
 
   for (uint8_t channel=0; channel<NUM_CHANNELS; channel++) {
     if (sPwmCounter < vPwmValue[channel]) {
-      PORTA.OUTSET = channelPin_bm[channel];  // High
+      PORTA.OUTCLR = channelPin_bm[channel];  // LOW (active)
     } else {
-      PORTA.OUTCLR = channelPin_bm[channel];  // Low
+      PORTA.OUTSET = channelPin_bm[channel];  // HIGH
     }
   }
+
+  // // Geringfügig mehr flash, aber schneller(?)
+  // uint8_t clrMask = 0;
   // uint8_t setMask = 0;
-  // if(sPwmCounter < vPwmValue[0]) setMask |= CH1_PIN;
-  // if(sPwmCounter < vPwmValue[1]) setMask |= CH2_PIN;
-  // if(sPwmCounter < vPwmValue[2]) setMask |= CH3_PIN;
-  // if(sPwmCounter < vPwmValue[3]) setMask |= CH4_PIN;
-  // PORTA.OUT = (PORTA.OUT & ~(CH1_PIN|CH2_PIN|CH3_PIN|CH4_PIN)) | setMask;
+
+  // if (sPwmCounter < vPwmValue[0]) clrMask |= CH1_PIN; else setMask |= CH1_PIN;
+  // if (sPwmCounter < vPwmValue[1]) clrMask |= CH2_PIN; else setMask |= CH2_PIN;
+  // if (sPwmCounter < vPwmValue[2]) clrMask |= CH3_PIN; else setMask |= CH3_PIN;
+  // if (sPwmCounter < vPwmValue[3]) clrMask |= CH4_PIN; else setMask |= CH4_PIN;
+
+  // PORTA.OUTCLR = clrMask;   // aktive Kanäle einschalten
+  // PORTA.OUTSET = setMask;   // inaktive ausschalten
 
 
   sPwmCounter++;
