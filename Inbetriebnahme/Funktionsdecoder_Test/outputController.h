@@ -7,7 +7,7 @@
 
 #define PWM_MAX 0xFF
 
-enum State{OFF, TRANSITION_ON, ON, TRANSITION_OFF};
+enum State{OFF, SWITCH_ON, TRANSITION_ON, ON, SWITCH_OFF, TRANSITION_OFF};
 enum Mode{FADE, NEON, BLINK};
 
 namespace OutputController {

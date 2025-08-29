@@ -21,15 +21,6 @@ uint8_t flackerCount[NUM_CHANNELS];
 
 
 namespace OutputController{
-  // Local variables
-  // uint32_t functionMap[NUM_CHANNELS] = {0b00000010, 0b00000100, 0b00001000, 0b00010000};
-  // uint8_t dimmValue[NUM_CHANNELS] = {127, 127, 127, 127};
-  // uint8_t fadeSpeed[NUM_CHANNELS] = {0, 50, 50, 50};
-  // uint8_t blinkOnTime[NUM_CHANNELS] = {2, 50, 50, 50};
-  // uint8_t blinkOffTime[NUM_CHANNELS] = {200, 150, 150, 150};
-  // Mode mode[NUM_CHANNELS] = {BLINK, FADE, FADE, FADE};
-  // Direction direction = FORWARD;
-  // State channelPinState[4] = {OFF, OFF, OFF, OFF};  
   uint32_t functionMap[NUM_CHANNELS];
   uint8_t dimmValue[NUM_CHANNELS];
   uint8_t fadeSpeed[NUM_CHANNELS];
@@ -37,7 +28,7 @@ namespace OutputController{
   uint8_t blinkOffTime[NUM_CHANNELS];
   Mode mode[NUM_CHANNELS];
   Direction direction;
-  State channelPinState[4];
+  State channelState[4];
 
   void begin(){
     // configure output pins
@@ -47,21 +38,12 @@ namespace OutputController{
 
     // setup Timer A for software-PWM with >100Hz frequency at 8bit resolution
     // 20 MHz / 8 = 2.5 MHz → 1 Takt = 0.4 µs → 30 µs = 75 Takte
-
-    // TCB0.CTRLB = TCB_CNTMODE_INT_gc;   // Periodic Interrupt Mode  // <-- default 
     TCB0.CCMP = 599;                   // 600 Takte @ 20 MHz = 30 µs
     TCB0.INTCTRL = TCB_CAPT_bm;        // Interrupt enable
     TCB0.CTRLA = TCB_ENABLE_bm;        // Timer einschalten (kein Prescaler = CLK_PER)
-    // TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV8_gc;   // Clock = 20 MHz / 8 = 2.5 MHz
-    // TCA0.SINGLE.PER = 74;                            // Compare match nach 75 Takten = 30 µs
-    // TCA0.SINGLE.INTCTRL = TCA_SINGLE_CMP0_bm;        // Compare match interrupt aktivieren
-    // TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm;       // Timer aktivieren
 
     // setup RTC for 10 ms Interrupt
-    // RTC.CTRLA = 0;                                      // stop RTC
-    // RTC.CLKSEL = RTC_CLKSEL_INT32K_gc;                  // select 32.768 Osc. as source  // <-- default 
     RTC.PER = 15;                                      // period = 163 ticks ~= 5 ms
-    //RTC.INTFLAGS = RTC_OVF_bm;                          // clear Overflow flag
     RTC.INTCTRL = RTC_OVF_bm;                           // activate overflow interrupt
     RTC.CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;   // Prescaler 1, start RTC
   }
@@ -80,7 +62,14 @@ namespace OutputController{
       blinkOffTime[i] = EEPROM.read(ch1BlinkOffTime + i);
     }
 
+    mode[0] = NEON;
+
     dimmValue[0] = 127;
+    dimmValue[1] = 127;
+    fadeSpeed[0] = 20;
+    fadeSpeed[1] = 5;
+    blinkOnTime[0] = 200;
+    blinkOffTime[0] = 200;
   }
 
   void update(Direction direction, uint8_t speed, uint32_t functions) {
@@ -88,48 +77,103 @@ namespace OutputController{
       bool channelIsOn = isChannelOn(functions, channel);
       bool directionMatches = directionMatchesConfig(channel, direction);
 
-      // if(channelIsOn && directionMatches) {
       if(channelIsOn) {
         vPwmValue[channel] = 0;
-        channelPinState[channel] = TRANSITION_ON;
+        channelState[channel] = SWITCH_ON;
         flackerCount[channel] = 0;
-        // if(channel==0) DccPacketHandler::confirmCvWrite();
-      } 
-      else {
-        if(channelPinState[channel] == ON || channelPinState[channel] == TRANSITION_ON) {
-          channelPinState[channel] = TRANSITION_OFF;
-        }
       }
+      else if(channelState[channel] == ON || channelState[channel] == TRANSITION_ON) {
+        channelState[channel] = SWITCH_OFF;
+      }
+
     }
   }
 
   void run() {
     static uint16_t nextEvent[NUM_CHANNELS] = {0};
 
-    for(uint8_t channel=0; channel<NUM_CHANNELS; channel++){
+    for(uint8_t channel = 0; channel < NUM_CHANNELS; channel++) {
+
+      if (channelState[channel] == SWITCH_ON) {  
+        cli();
+        __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+        nextEvent[channel] = vRtcOverflowCounter;
+        __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+        sei();
+        
+        channelState[channel] = TRANSITION_ON;
+      }
+      else if (channelState[channel] == SWITCH_OFF) {
+        cli();
+        __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+        nextEvent[channel] = vRtcOverflowCounter;
+        __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
+        sei();
+
+        channelState[channel] = TRANSITION_OFF;
+      }
+
       switch(mode[channel]) {
-        case FADE:
-          if(channelPinState[channel] == TRANSITION_ON) {
-            // if(channel==0) DccPacketHandler::confirmCvWrite();
-            // if(fade_in(channel, &nextEvent[channel])){
+        case FADE:    
+          if(channelState[channel] == TRANSITION_ON) {
             if(fade(channel, &nextEvent[channel], FADE_IN)) {
-              channelPinState[channel] = ON;
+              channelState[channel] = ON;
             }
           }
-          if(channelPinState[channel] == TRANSITION_OFF) {
+          else if(channelState[channel] == TRANSITION_OFF) {
             if(fade(channel, &nextEvent[channel], FADE_OUT)) {
-              channelPinState[channel] = OFF;
+              channelState[channel] = OFF;
             }
           }
           break;
+
         case BLINK:
-          blink(channel, &nextEvent[channel]);
+          if(channelState[channel] == TRANSITION_ON) {
+            blink(channel, &nextEvent[channel]);
+          }
+          else if(channelState[channel] == TRANSITION_OFF) {
+            if(fade(channel, &nextEvent[channel], FADE_OUT)) {
+              channelState[channel] = OFF;
+            }
+          }
           break;
+          
         case NEON:
-          neon(channel, &nextEvent[channel]);
+          if(channelState[channel] == TRANSITION_ON) {
+            neon(channel, &nextEvent[channel]);
+          }
+          else if (channelState[channel] == TRANSITION_OFF) {
+            fadeSpeed[channel] = 0;
+            fade(channel, &nextEvent[channel], FADE_OUT);
+          }
           break;
       }
     }
+
+
+    // for(uint8_t channel=0; channel<NUM_CHANNELS; channel++){
+    //   switch(mode[channel]) {
+    //     case FADE:
+    //       if(channelState[channel] == TRANSITION_ON) {
+    //         if(fade(channel, &nextEvent[channel], FADE_IN)) {
+    //           channelState[channel] = ON;
+    //           DccPacketHandler::confirmCvWrite();
+    //         }
+    //       }
+    //       if(channelState[channel] == TRANSITION_OFF) {
+    //         if(fade(channel, &nextEvent[channel], FADE_OUT)) {
+    //           channelState[channel] = OFF;
+    //         }
+    //       }
+    //       break;
+    //     case BLINK:
+    //       blink(channel, &nextEvent[channel]);
+    //       break;
+    //     case NEON:
+    //       neon(channel, &nextEvent[channel]);
+    //       break;
+    //   }
+    // }
   }
 
 
@@ -138,10 +182,9 @@ namespace OutputController{
 
     if(fadeSpeed[channel] == 0) {      
       vPwmValue[channel] = targetDimmValue;
-      if(channel == 0) {
-        up ? (PORTA.OUTCLR = CH1_PIN) : (PORTA.OUTSET = CH1_PIN);
-      }
-      // if(channel == 0 && vPwmValue[0] == 127) DccPacketHandler::confirmCvWrite();
+      return true;
+    }
+    else if(vPwmValue[channel] == targetDimmValue) {
       return true;
     }
     else {
@@ -154,8 +197,7 @@ namespace OutputController{
       if(overflowCounter == *nextEvent) {
         *nextEvent += fadeSpeed[channel];
         up ? vPwmValue[channel]++ : vPwmValue[channel]--;
-        if (vPwmValue[channel] == targetDimmValue){
-          
+        if (vPwmValue[channel] == targetDimmValue){ 
           return true;
         }
       }
@@ -165,57 +207,11 @@ namespace OutputController{
 
   }
 
-  // bool fade_in(uint8_t channel, uint16_t* nextEvent) {
-  //   if(fadeSpeed[channel] == 0) {
-  //     vPwmValue[channel] = dimmValue[channel];
-  //     return true;
-  //   }
-  //   else {
-  //     cli();
-  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-  //     uint16_t overflowCounter = vRtcOverflowCounter;
-  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-  //     sei();
-
-  //     if(overflowCounter == *nextEvent) {
-  //       *nextEvent += fadeSpeed[channel];
-  //       vPwmValue[channel]++;
-  //       if (vPwmValue[channel] == dimmValue[channel]){
-  //         return true;
-  //       }
-  //     }
-  //   }
-  //   return false;
-  // }
-
-  // bool fade_out(uint8_t channel, uint16_t* nextEvent) {
-  //   if(fadeSpeed[channel] == 0) {
-  //     vPwmValue[channel] = 0;
-  //     return true;
-  //   }
-  //   else {
-  //     cli();
-  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-  //     uint16_t overflowCounter = vRtcOverflowCounter;
-  //     __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-  //     sei();
-
-  //     if(overflowCounter == *nextEvent) {
-  //       *nextEvent += fadeSpeed[channel];
-  //       vPwmValue[channel]--;
-  //       if (vPwmValue[channel] == 0){
-  //         return true;
-  //       }
-  //     }
-  //   }
-  //   return false;
-  // }
-
   enum BlinkState{BLINK_FADE_IN, BLINK_ON, BLINK_FADE_OUT, BLINK_OFF};
   void blink(uint8_t channel, uint16_t* nextEvent) {
     static BlinkState blinkState[NUM_CHANNELS] = {BLINK_FADE_IN, BLINK_FADE_IN, BLINK_FADE_IN, BLINK_FADE_IN};
 
-    if(channelPinState[channel] == TRANSITION_ON) {
+    // if(channelState[channel] == TRANSITION_ON) {
       switch(blinkState[channel]) {
         case BLINK_FADE_IN:
           if(fade(channel, nextEvent, FADE_IN)) {
@@ -241,7 +237,7 @@ namespace OutputController{
           }
           break;
       }
-    }
+    // }
   }
 
   bool wait(uint8_t channel, uint16_t* nextEvent){
@@ -261,22 +257,26 @@ namespace OutputController{
   void neon(uint8_t channel, uint16_t* nextEvent) {
     static TubeState tubeState = FLICKER;
     blinkOnTime[channel] = 2;
-    fadeSpeed[channel] = 0;
 
-    if (channelPinState[channel] == TRANSITION_ON) {
+    if (channelState[channel] == TRANSITION_ON) {
       if(tubeState == FLICKER) {
+        fadeSpeed[channel] = 0;
+
         if(flackerCount[channel] <= myRandomNumber(4, 20)) {  // random(8,13)
           blinkOffTime[channel] = myRandomNumber(32,160); // random(100,300)
           blink(channel, nextEvent);
         }
         else {
+          vPwmValue[channel] = dimmValue[channel]/16;
+          fadeSpeed[channel] = 150; // langsames faden
           tubeState = RAMP_UP;
         }
       }
       else { // tubestate == RAMP_UP
-        vPwmValue[channel] = dimmValue[channel]/16;
-        fadeSpeed[channel] = 150; // langsames faden
-        mode[channel] = FADE;
+        if(fade(channel, nextEvent, FADE_IN)) {
+          channelState[channel] = ON;
+          tubeState == FLICKER;
+        }
       }
     }
   }
@@ -318,30 +318,13 @@ uint8_t myRandomNumber(uint8_t min, uint8_t max){
 ISR(TCB0_INT_vect) {
   static uint8_t sPwmCounter = 0;
 
-  // if(vPwmValue[0] == 0) DccPacketHandler::confirmCvWrite();
-  // vPwmValue[0] = 127;
-
-  for (uint8_t channel=1; channel<NUM_CHANNELS; channel++) {
-    if (sPwmCounter < vPwmValue[channel]) {
-      PORTA.OUTCLR = channelPin_bm[channel];  // LOW (active)
-    }
-    else {
-      PORTA.OUTSET = channelPin_bm[channel];  // HIGH
-    }
+  PORTA.OUTSET = CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN;
+  for (uint8_t channel = 0; channel < NUM_CHANNELS; channel++) {
+      uint8_t val = vPwmValue[channel];  // lokale Kopie für Konsistenz
+      if (sPwmCounter < val) {
+          PORTA.OUTCLR = channelPin_bm[channel];  // LED an
+      }
   }
-
-  // // Geringfügig mehr flash, aber schneller(?)
-  // uint8_t clrMask = 0;
-  // uint8_t setMask = 0;
-
-  // if (sPwmCounter < vPwmValue[0]) clrMask |= CH1_PIN; else setMask |= CH1_PIN;
-  // if (sPwmCounter < vPwmValue[1]) clrMask |= CH2_PIN; else setMask |= CH2_PIN;
-  // if (sPwmCounter < vPwmValue[2]) clrMask |= CH3_PIN; else setMask |= CH3_PIN;
-  // if (sPwmCounter < vPwmValue[3]) clrMask |= CH4_PIN; else setMask |= CH4_PIN;
-
-  // PORTA.OUTCLR = clrMask;   // aktive Kanäle einschalten
-  // PORTA.OUTSET = setMask;   // inaktive ausschalten
-
 
   sPwmCounter++;
   TCB0.INTFLAGS = TCB_CAPT_bm;  // Interrupt-Flag löschen

@@ -27,6 +27,7 @@ void loop() {
     DccPacketHandler::hasUpdate = false;
     OutputController::update(DccPacketHandler::direction, DccPacketHandler::speed, DccPacketHandler::functions);
   }
+  
   OutputController::run();
 
 }

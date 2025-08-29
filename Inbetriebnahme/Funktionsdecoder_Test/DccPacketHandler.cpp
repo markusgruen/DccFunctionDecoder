@@ -74,7 +74,6 @@ namespace DccPacketHandler {
     }
     
     if(dccAddress == address || dccAddress == consistAddress) {
-      // DccPacketHandler::confirmCvWrite();
       if(bit_is_clear(dccPacket[1+addressShift], 7)) { // is speed packet
         getSpeedAndDirectionFromDcc();
       }
