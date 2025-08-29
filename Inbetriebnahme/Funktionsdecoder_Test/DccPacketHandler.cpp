@@ -1,6 +1,7 @@
 #include "DccPacketHandler.h"
 #include <EEPROM.h>
 #include "CV_default_values.h"
+#include "CV_table.h"
 #include "pinmap.h"
 
 
@@ -18,7 +19,7 @@ namespace DccPacketHandler {
 
   // Internal variables
   bool hasShortAddress = true;
-  uint16_t address = 0xFFFF;
+  uint16_t address = 3;
   uint8_t consistAddress = 0;
   uint8_t lastDccErrorByte = 0;
 
@@ -73,6 +74,7 @@ namespace DccPacketHandler {
     }
     
     if(dccAddress == address || dccAddress == consistAddress) {
+      // DccPacketHandler::confirmCvWrite();
       if(bit_is_clear(dccPacket[1+addressShift], 7)) { // is speed packet
         getSpeedAndDirectionFromDcc();
       }
@@ -85,12 +87,12 @@ namespace DccPacketHandler {
   }
 
   void getAddressFromCV() {
-    uint8_t cv29 = EEPROM.read(29);
+    uint8_t cv29 = EEPROM.read(CONFIGBYTE);
 
     // check if short or long address:
     if(bit_is_set(cv29, 4)) {
-      uint8_t cv17 = EEPROM.read(17);
-      uint8_t cv18 = EEPROM.read(18);
+      uint8_t cv17 = EEPROM.read(LONGADDRESS1);
+      uint8_t cv18 = EEPROM.read(LONGADDRESS2);
       // if(cv17 > 231) {  // remove to save flash
       //   address = 0xFFFF;
       // }
@@ -100,7 +102,7 @@ namespace DccPacketHandler {
     }
 
     else { // short address
-      address = EEPROM.read(1); // short address is stored in CV1
+      address = EEPROM.read(SHORTADDRESS); // short address is stored in CV1
       // if(address < 3 || address > 127) {  // remove to save flash
       //   address = 0xFFFF;
       // }
@@ -108,7 +110,7 @@ namespace DccPacketHandler {
   }
 
   void getConsistAddressFromCV() {
-    consistAddress = EEPROM.read(19) & 0b01111111;
+    consistAddress = EEPROM.read(CONSISTADDRESS) & 0b01111111;
   }
 
   uint16_t getAddressFromDcc() {

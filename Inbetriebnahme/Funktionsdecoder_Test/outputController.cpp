@@ -30,14 +30,14 @@ namespace OutputController{
   // Mode mode[NUM_CHANNELS] = {BLINK, FADE, FADE, FADE};
   // Direction direction = FORWARD;
   // State channelPinState[4] = {OFF, OFF, OFF, OFF};  
-  uint32_t functionMap[NUM_CHANNELS] = {0b00000010, 0b00000100, 0b00001000, 0b00010000};
-  uint8_t dimmValue[NUM_CHANNELS] = {127, 127, 127, 127};
-  uint8_t fadeSpeed[NUM_CHANNELS] = {0, 50, 50, 50};
-  uint8_t blinkOnTime[NUM_CHANNELS] = {2, 50, 50, 50};
-  uint8_t blinkOffTime[NUM_CHANNELS] = {200, 150, 150, 150};
-  Mode mode[NUM_CHANNELS] = {BLINK, FADE, FADE, FADE};
-  Direction direction = FORWARD;
-  State channelPinState[4] = {OFF, OFF, OFF, OFF};
+  uint32_t functionMap[NUM_CHANNELS];
+  uint8_t dimmValue[NUM_CHANNELS];
+  uint8_t fadeSpeed[NUM_CHANNELS];
+  uint8_t blinkOnTime[NUM_CHANNELS];
+  uint8_t blinkOffTime[NUM_CHANNELS];
+  Mode mode[NUM_CHANNELS];
+  Direction direction;
+  State channelPinState[4];
 
   void begin(){
     // configure output pins
@@ -79,6 +79,8 @@ namespace OutputController{
       blinkOnTime[i] = EEPROM.read(ch1BlinkOnTime + i);
       blinkOffTime[i] = EEPROM.read(ch1BlinkOffTime + i);
     }
+
+    dimmValue[0] = 127;
   }
 
   void update(Direction direction, uint8_t speed, uint32_t functions) {
@@ -86,11 +88,12 @@ namespace OutputController{
       bool channelIsOn = isChannelOn(functions, channel);
       bool directionMatches = directionMatchesConfig(channel, direction);
 
-      if(channelIsOn && directionMatches) {
+      // if(channelIsOn && directionMatches) {
+      if(channelIsOn) {
         vPwmValue[channel] = 0;
         channelPinState[channel] = TRANSITION_ON;
         flackerCount[channel] = 0;
-        
+        // if(channel==0) DccPacketHandler::confirmCvWrite();
       } 
       else {
         if(channelPinState[channel] == ON || channelPinState[channel] == TRANSITION_ON) {
@@ -107,6 +110,7 @@ namespace OutputController{
       switch(mode[channel]) {
         case FADE:
           if(channelPinState[channel] == TRANSITION_ON) {
+            // if(channel==0) DccPacketHandler::confirmCvWrite();
             // if(fade_in(channel, &nextEvent[channel])){
             if(fade(channel, &nextEvent[channel], FADE_IN)) {
               channelPinState[channel] = ON;
@@ -132,8 +136,12 @@ namespace OutputController{
   bool fade(uint8_t channel, uint16_t* nextEvent, bool up) {
     uint8_t targetDimmValue = up ? dimmValue[channel] : 0;
 
-    if(fadeSpeed[channel] == 0) {
+    if(fadeSpeed[channel] == 0) {      
       vPwmValue[channel] = targetDimmValue;
+      if(channel == 0) {
+        up ? (PORTA.OUTCLR = CH1_PIN) : (PORTA.OUTSET = CH1_PIN);
+      }
+      // if(channel == 0 && vPwmValue[0] == 127) DccPacketHandler::confirmCvWrite();
       return true;
     }
     else {
@@ -147,6 +155,7 @@ namespace OutputController{
         *nextEvent += fadeSpeed[channel];
         up ? vPwmValue[channel]++ : vPwmValue[channel]--;
         if (vPwmValue[channel] == targetDimmValue){
+          
           return true;
         }
       }
@@ -309,10 +318,14 @@ uint8_t myRandomNumber(uint8_t min, uint8_t max){
 ISR(TCB0_INT_vect) {
   static uint8_t sPwmCounter = 0;
 
-  for (uint8_t channel=0; channel<NUM_CHANNELS; channel++) {
+  // if(vPwmValue[0] == 0) DccPacketHandler::confirmCvWrite();
+  // vPwmValue[0] = 127;
+
+  for (uint8_t channel=1; channel<NUM_CHANNELS; channel++) {
     if (sPwmCounter < vPwmValue[channel]) {
       PORTA.OUTCLR = channelPin_bm[channel];  // LOW (active)
-    } else {
+    }
+    else {
       PORTA.OUTSET = channelPin_bm[channel];  // HIGH
     }
   }

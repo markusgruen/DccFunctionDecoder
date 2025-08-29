@@ -7,8 +7,8 @@
 
 
 void setup() {
-  DccPacketHandler::begin();
   OutputController::begin();
+  DccPacketHandler::begin();
 
   // DccPacketHandler::resetCVsToDefault();
   OutputController::readCVs();
