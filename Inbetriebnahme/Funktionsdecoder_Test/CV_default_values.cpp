@@ -15,15 +15,15 @@ const CVDefaults defaultCVs[] = {
   {ch3DimmValue, 255},
   {ch4DimmValue, 255},
 
-  {ch1BlinkOnTime, 10},
-  {ch2BlinkOnTime, 10},
-  {ch3BlinkOnTime, 10},
-  {ch4BlinkOnTime, 10},
+  {ch1BlinkOnTime, 80},
+  {ch2BlinkOnTime, 80},
+  {ch3BlinkOnTime, 80},
+  {ch4BlinkOnTime, 80},
 
-  {ch1BlinkOffTime, 50},
-  {ch2BlinkOffTime, 50},
-  {ch3BlinkOffTime, 50},
-  {ch4BlinkOffTime, 50},
+  {ch1BlinkOffTime, 150},
+  {ch2BlinkOffTime, 150},
+  {ch3BlinkOffTime, 150},
+  {ch4BlinkOffTime, 150},
 };
 
 const uint8_t numDefaultCVs = sizeof(defaultCVs) / sizeof(CVDefaults);

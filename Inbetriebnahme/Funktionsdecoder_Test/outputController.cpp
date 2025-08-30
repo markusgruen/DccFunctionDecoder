@@ -11,13 +11,12 @@
 uint16_t getPseudoRandomNumber();
 uint8_t myRandomNumber(uint8_t min, uint8_t max);
 
-#define FADE_IN 1
-#define FADE_OUT 0
+
 
 
 // Volatile variables
 volatile uint8_t vPwmValue[NUM_CHANNELS] = {0};
-volatile uint16_t vRtcOverflowCounter; 
+volatile uint8_t vRtcOverflowCounter; 
 
 // Global variables
 const uint8_t channelPin_bm[NUM_CHANNELS] = {CH1_PIN, CH2_PIN, CH3_PIN, CH4_PIN};
@@ -32,7 +31,7 @@ namespace OutputController{
   uint8_t blinkOffTime[NUM_CHANNELS];
   Mode mode[NUM_CHANNELS];
   Direction direction;
-  State channelState[4] = {INACTIVE};
+  bool channelState[4] = {0};
 
   void begin(){
     // configure output pins
@@ -66,96 +65,33 @@ namespace OutputController{
       blinkOffTime[i] = EEPROM.read(ch1BlinkOffTime + i);
     }
 
-    mode[0] = BLINK;
+    // mode[0] = NEON;
 
-    dimmValue[0] = 127;
-    dimmValue[1] = 127;
-    fadeSpeed[0] = 5;
-    fadeSpeed[1] = 5;
-    blinkOnTime[0] = 200;
-    blinkOffTime[0] = 200;
+    // dimmValue[0] = 127;
+    // fadeSpeed[0] = 5;
+    // blinkOnTime[0] = 200;
+    // blinkOffTime[0] = 200;
   }
 
-
-  void update(Direction direction, uint8_t speed, uint32_t functions) {
+  void update(Direction direction, uint32_t functions) {
     for(uint8_t channel=0; channel<NUM_CHANNELS; channel++) {
-      channelState[channel] = isChannelOn(functions, channel) ? ACTIVE : INACTIVE;
+      channelState[channel] = isChannelOn(functions, channel) && directionMatchesConfig(channel, direction);
     }
   }
 
   void run() {  
     for(uint8_t channel = 0; channel < NUM_CHANNELS; channel++) {
-      if(channelState[channel] == ACTIVE){
-        switch(mode[channel]) {
-          case FADE:
-            fadeStateMachine(channel, 1);
-            break;
-
-          case BLINK:
-            blinkStateMachine(channel, 1);
-            break;
-        }
-      }
-      else { // channelState[channel] == INACTIVE
-        switch(mode[channel]) {
-          case FADE:
-            fadeStateMachine(channel, 0);
-            break;
-
-          case BLINK:
-            blinkStateMachine(channel, 0);
-            break;
-        }
-      }
-    }
-  }
-
-  enum FadeStates{FADE_CONSTANT_OFF, FADE_TRANSITION_ON, FADE_CONSTANT_ON, FADE_TRANSITION_OFF};
-  void fadeStateMachine(uint8_t channel, bool fade_in) {
-    static FadeStates fadeState[NUM_CHANNELS] = {FADE_CONSTANT_OFF};
-    static uint16_t nextEvent[NUM_CHANNELS] = {0};
-
-    if(fade_in) {
-      switch(fadeState[channel]) {
-        case FADE_CONSTANT_OFF:
-          // TODO MAKE SAFE
-          nextEvent[channel] = vRtcOverflowCounter;
-          fadeState[channel] = FADE_TRANSITION_ON;
+      switch(mode[channel]) {
+        case FADE:
+          fade(channel, channelState[channel]);
           break;
 
-        case FADE_TRANSITION_OFF:
-          fadeState[channel] = FADE_TRANSITION_ON;
+        case BLINK:
+          blinkStateMachine(channel, channelState[channel]);
           break;
 
-        case FADE_TRANSITION_ON:
-          if(fade(channel, &nextEvent[channel], FADE_IN)) {
-            fadeState[channel] = FADE_CONSTANT_ON;
-          }
-          break;
-        
-        case FADE_CONSTANT_ON:
-          break;
-      }
-    }
-    else {  // fade_out
-      switch(fadeState[channel]) {
-        case FADE_CONSTANT_ON:
-        // TODO MAKE SAFE
-          nextEvent[channel] = vRtcOverflowCounter;
-          fadeState[channel] = FADE_TRANSITION_OFF;
-          break;
-
-        case FADE_TRANSITION_ON:      
-          fadeState[channel] = FADE_TRANSITION_OFF;
-          break;
-
-        case FADE_TRANSITION_OFF:
-          if(fade(channel, &nextEvent[channel], FADE_OUT)) {
-            fadeState[channel] = FADE_CONSTANT_OFF;
-          }
-          break;
-
-        case FADE_CONSTANT_OFF:
+        case NEON:
+          neonStateMachine(channel, channelState[channel]);
           break;
       }
     }
@@ -164,155 +100,153 @@ namespace OutputController{
   enum BlinkStates{BLINK_OFF, BLINK_WAIT_OFF, BLINK_FADE_IN, BLINK_WAIT_ON, BLINK_FADE_OUT};
   void blinkStateMachine(uint8_t channel, bool switch_on) {
     static BlinkStates blinkState[NUM_CHANNELS] = {BLINK_OFF};
-    static uint16_t nextEvent[NUM_CHANNELS] = {0};
+    uint8_t waitCount[NUM_CHANNELS] = {0};
 
     if(switch_on) {
       switch(blinkState[channel]) {
         case BLINK_OFF:
-          nextEvent[channel] = vRtcOverflowCounter;
           blinkState[channel] = BLINK_FADE_IN;
           break;
         
         case BLINK_FADE_IN:
-          if(fade(channel, &nextEvent[channel], FADE_IN)) {
-            nextEvent[channel] += 10*blinkOnTime[channel];
+          if(fade(channel, 1)) {
+            waitCount[channel] = 0;
             blinkState[channel] = BLINK_WAIT_ON;
           }
           break;
 
         case BLINK_WAIT_ON:
-          if(wait(&nextEvent[channel])) { // if wait_is_over
-             blinkState[channel] = BLINK_FADE_OUT;
+          waitCount[channel] += wait(channel, blinkOnTime[channel]);
+          if(waitCount[channel] >= 100) { // if wait_is_over
+            blinkState[channel] = BLINK_FADE_OUT;
+            waitCount[channel] = 0;
           }
           break;
 
         case BLINK_FADE_OUT:
-          if(fade(channel, &nextEvent[channel], FADE_OUT)) {
-            nextEvent[channel] += 10*blinkOffTime[channel];
+          if(fade(channel, 0)) {
+            waitCount[channel] = 0;
             blinkState[channel] = BLINK_WAIT_OFF;
           }
           break;
         
         case BLINK_WAIT_OFF:
-          if(wait(&nextEvent[channel])) { // if wait_is_over
+          waitCount[channel] += wait(channel, blinkOnTime[channel]);
+          if(waitCount[channel] >= 100) { // if wait_is_over
              blinkState[channel] = BLINK_FADE_IN;
+             flackerCount[channel]++;
+             waitCount[channel] = 0;
           }
           break;
       }
     }
     else { // if (switch_off)
-    switch(blinkState[channel]) {
-        case BLINK_FADE_OUT:
-          if(fade(channel, &nextEvent[channel], FADE_OUT)) {
-              blinkState[channel] = BLINK_OFF;
-          }
-          break;
-
-        case BLINK_OFF:
-          break;
-
-        default:
-          nextEvent[channel] = vRtcOverflowCounter;
-          blinkState[channel] = BLINK_FADE_OUT;
-          break;
+      wait(channel, 0, true);
+      if(fade(channel, 0)) {
+        blinkState[channel] = BLINK_OFF;
       }
     }
   }
 
   enum NeonStates{NEON_OFF, NEON_FLICKER, NEON_FADE_IN, NEON_CONSTANT_ON};
-  // void neonStateMachine(uint8_t channel, bool switch_on) {
-  //   static NEONStates neonState[NUM_CHANNELS] = {NEON_OFF};
-  //   static uint16_t nextEvent[NUM_CHANNELS] = {0};
+  void neonStateMachine(uint8_t channel, bool switch_on) {
+    static NeonStates neonState[NUM_CHANNELS] = {NEON_OFF};
+    blinkOnTime[channel] = 2;
 
-  //   if(switch_on) {
-  //     switch(neonState[channel]) {
-  //       case NEON_OFF:
-  //         flackerCount[channel] = 0;
-  //         neonState[channel] = NEON_FLICKER;
-  //         break;
+    if(switch_on) {
+      switch(neonState[channel]) {
+        case NEON_OFF:
+          flackerCount[channel] = 0;
+          fadeSpeed[channel] = 0;
+          neonState[channel] = NEON_FLICKER;
+          break;
         
+        case NEON_FLICKER:
+          if(flackerCount[channel] <= myRandomNumber(4, 20)) {
+            blinkOffTime[channel] = myRandomNumber(32,160); // random(100,300)
+            blinkStateMachine(channel, 1);
+          }
+          else {
+            vPwmValue[channel] = dimmValue[channel]/16;
+            fadeSpeed[channel] = 15; // langsames faden    
+            neonState[channel] = NEON_FADE_IN;
+          }
+          break;
 
-  //         if(flackerCount[channel] <= myRandomNumber(4, 20)) {  // random(8,13)
-  // //         blinkOffTime[channel] = myRandomNumber(32,160); // random(100,300)
-  // //         blink(channel, nextEvent);
-  // //       }
-  // //       else {
-  // //         vPwmValue[channel] = dimmValue[channel]/16;
-  // //         fadeSpeed[channel] = 150; // langsames faden
-  // //         tubeState = RAMP_UP;
-  // //       }
+        case NEON_FADE_IN:
+          if(fade(channel, 1)) {
+            neonState[channel] = NEON_CONSTANT_ON;
+          }
+          break;
 
-  // }
+        case NEON_CONSTANT_ON:
+          break;        
+      }
+    }
 
+    else { // if(switch_off)
+      fadeSpeed[channel] = 1;
+      if(fade(channel, 0)) {
+        neonState[channel] = NEON_OFF;
+      }
+    }
+  }
 
-  bool fade(uint8_t channel, uint16_t* nextEvent, bool up) {
-    uint8_t targetDimmValue = up ? dimmValue[channel] : 0;
+  enum FadeStates{FADE_START, FADE_RUNNING};
+  bool fade(uint8_t channel, bool fade_in) {
+    static FadeStates fadeState[NUM_CHANNELS] = {FADE_START};
+    static uint8_t nextEvent[NUM_CHANNELS] = {0};
 
+    uint8_t targetDimmValue = fade_in ? dimmValue[channel] : 0;
+    
     if(fadeSpeed[channel] == 0) {      
       vPwmValue[channel] = targetDimmValue;
+      fadeState[channel] = FADE_START;
       return true;
     }
     else if(vPwmValue[channel] == targetDimmValue) {
+      fadeState[channel] = FADE_START;
       return true;
     }
     else {
-      cli();
-      __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-      uint16_t overflowCounter = vRtcOverflowCounter;
-      __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-      sei();
+      if(fadeState[channel] == FADE_START) {
+        nextEvent[channel] = vRtcOverflowCounter;
+        fadeState[channel] = FADE_RUNNING;
+      }
 
-      if(overflowCounter == *nextEvent) {
-        *nextEvent += fadeSpeed[channel];
-        up ? vPwmValue[channel]++ : vPwmValue[channel]--;
-        if (vPwmValue[channel] == targetDimmValue){ 
-          return true;
+      if(fadeState[channel] == FADE_RUNNING) {
+        uint8_t overflowCounter = vRtcOverflowCounter;
+        if(overflowCounter == nextEvent[channel]) {
+          nextEvent[channel] += fadeSpeed[channel];
+          if (vPwmValue[channel] == targetDimmValue){ 
+            fadeState[channel] = FADE_START;
+            return true;
+          }
+          fade_in ? vPwmValue[channel]++ : vPwmValue[channel]--;
         }
       }
     }
     return false;
   }
 
-  
-  bool wait(uint16_t* nextEvent){
-    cli();
-    __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-    uint16_t overflowCounter = vRtcOverflowCounter;
-    __asm__ __volatile__ ("" ::: "memory");  // Verhindert Optimierung
-    sei();
+  enum WaitStates{WAIT_START, WAIT_RUNNING};
+  bool wait(uint8_t channel, uint8_t waitTime, bool reset){
+    static WaitStates waitState[NUM_CHANNELS] = {WAIT_START};
+    static uint8_t stopTime[NUM_CHANNELS] = {0};
+    
+    if(reset) waitState[channel] = WAIT_START;
 
-    if(overflowCounter == *nextEvent) {
+    if(waitState[channel] == WAIT_START) {
+      stopTime[channel] = vRtcOverflowCounter + waitTime;
+      waitState[channel] = WAIT_RUNNING;
+    }
+
+    uint8_t currentTime = vRtcOverflowCounter;
+    if(currentTime == stopTime[channel]) {
+      waitState[channel] = WAIT_START;
       return true;
     }
     return false;
-  }
-
-  enum TubeState{FLICKER, RAMP_UP};
-  void neon(uint8_t channel, uint16_t* nextEvent) {
-  //   static TubeState tubeState = FLICKER;
-  //   blinkOnTime[channel] = 2;
-
-  //   if (channelState[channel] == TRANSITION_ON) {
-  //     if(tubeState == FLICKER) {
-  //       fadeSpeed[channel] = 0;
-
-  //       if(flackerCount[channel] <= myRandomNumber(4, 20)) {  // random(8,13)
-  //         blinkOffTime[channel] = myRandomNumber(32,160); // random(100,300)
-  //         blink(channel, nextEvent);
-  //       }
-  //       else {
-  //         vPwmValue[channel] = dimmValue[channel]/16;
-  //         fadeSpeed[channel] = 150; // langsames faden
-  //         tubeState = RAMP_UP;
-  //       }
-  //     }
-  //     else { // tubestate == RAMP_UP
-  //       if(fade(channel, nextEvent, FADE_IN)) {
-  //         channelState[channel] = ON;
-  //         tubeState == FLICKER;
-  //       }
-  //     }
-  //   }
   }
 
   bool forwardOnly(uint8_t channel) {

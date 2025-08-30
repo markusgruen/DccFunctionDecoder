@@ -3,7 +3,7 @@
 
 
 //      EEPROMaddress    CV
-#define SHORTADDRESS      3
+#define SHORTADDRESS      1
 #define LONGADDRESS1     17
 #define LONGADDRESS2     18
 #define CONSISTADDRESS   19

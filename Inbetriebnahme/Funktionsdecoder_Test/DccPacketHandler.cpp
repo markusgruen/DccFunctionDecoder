@@ -3,6 +3,7 @@
 #include "CV_default_values.h"
 #include "CV_table.h"
 #include "pinmap.h"
+#include "outputController.h" // for readCVs und dimmValue
 
 
 void(* resetController) (void) = 0;
@@ -44,38 +45,43 @@ namespace DccPacketHandler {
     uint8_t addressShift = (bool)dccIsLongAddress();
     uint16_t dccAddress = getAddressFromDcc();
 
-    // only write CVs when this is the "real" address
-    if((dccAddress == address)) {
+    // write CVs
+    if((dccAddress == address) && ((dccPacket[1+addressShift] & 0b11111100) == 0b11101100)) {
+      if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
+        if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
+          resetCVsToDefault();
 
-      // write CVs 
-      if((dccPacket[1+addressShift] & 0b11111100) == 0b11101100){  // if "write Byte to CV"
-        if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
-          if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
-            resetCVsToDefault();
+          for(uint8_t i=0; i<10; i++) {
+            confirmCvWrite();
+          }
 
-            for(uint8_t i=0; i<50; i++) {
-              confirmCvWrite();
-            }
-
-            resetController();
+          resetController();
+        }
+        else {
+          EEPROM.update(dccPacket[2+addressShift]+1, dccPacket[3+addressShift]); // [1] = address; [2] = value;
+          confirmCvWrite();
+          if(dccPacket[2+addressShift]+1 == CONFIGBYTE) {  // update address if CV 29 was written
+            getAddressFromCV();           
           }
           else {
-            EEPROM.update(dccPacket[2+addressShift]+1, dccPacket[3+addressShift]); // [1] = address; [2] = value;
-            confirmCvWrite();
-            if(dccPacket[2+addressShift]+1 == 29) {  // update address if CV 29 was written
-              getAddressFromCV();           
-            }
-          }   
-        }
-
-        lastDccErrorByte = dccPacket[dccPacketSize-1];
-        return;
+            getConsistAddressFromCV();
+            OutputController::readCVs();
+            vPwmValue[0] = OutputController::dimmValue[0];
+            vPwmValue[1] = OutputController::dimmValue[1];
+            vPwmValue[2] = OutputController::dimmValue[2];
+            vPwmValue[3] = OutputController::dimmValue[3];
+          }
+        }   
       }
+
+      lastDccErrorByte = dccPacket[dccPacketSize-1];
+      return;
     }
     
     if(dccAddress == address || dccAddress == consistAddress) {
       if(bit_is_clear(dccPacket[1+addressShift], 7)) { // is speed packet
-        getSpeedAndDirectionFromDcc();
+        //getSpeedAndDirectionFromDcc();
+        direction = getDirectionFromDcc();
       }
       else if(bit_is_set(dccPacket[1+addressShift], 7)) {  // is function packet
         functions = getFunctionsFromDcc();
@@ -121,24 +127,41 @@ namespace DccPacketHandler {
     }
   }
 
-  void getSpeedAndDirectionFromDcc() {
+  // void getSpeedAndDirectionFromDcc() {
+  //   uint8_t addressShift = (bool)dccIsLongAddress();
+  //   uint8_t oldSpeed = speed;
+  //   Direction oldDirection = direction;
+    
+    
+  //   if(dccPacket[1+addressShift] == 0x3F && dccPacketSize == 3+addressShift) { // if 127 speed steps
+  //     speed = (dccPacket[2+addressShift] & 0b01111111) -1; // -1, because 0x01 is emergency stop and 0x02 is speed=1
+  //     direction = bit_is_set(dccPacket[2+addressShift], 7) ? FORWARD : REVERSE;
+  //   }
+  //   else if(dccPacketSize == 2+addressShift) {
+  //     speed = dccPacket[1+addressShift] & 0b00011111;
+  //     direction = bit_is_set(dccPacket[1+addressShift], 5) ? FORWARD : REVERSE;
+  //   }
+    
+  //   if((speed != oldSpeed) ||(direction != oldDirection)) {
+  //     hasUpdate = true;
+  //   }
+  // }
+
+  Direction getDirectionFromDcc() {
     uint8_t addressShift = (bool)dccIsLongAddress();
-    uint8_t oldSpeed = speed;
     Direction oldDirection = direction;
     
-    
     if(dccPacket[1+addressShift] == 0x3F && dccPacketSize == 3+addressShift) { // if 127 speed steps
-      speed = (dccPacket[2+addressShift] & 0b01111111) -1; // -1, because 0x01 is emergency stop and 0x02 is speed=1
       direction = bit_is_set(dccPacket[2+addressShift], 7) ? FORWARD : REVERSE;
     }
     else if(dccPacketSize == 2+addressShift) {
-      speed = dccPacket[1+addressShift] & 0b00011111;
       direction = bit_is_set(dccPacket[1+addressShift], 5) ? FORWARD : REVERSE;
     }
     
-    if((speed != oldSpeed) ||(direction != oldDirection)) {
+    if(direction != oldDirection) {
       hasUpdate = true;
     }
+    return direction;
   }
 
   uint32_t getFunctionsFromDcc() {
@@ -201,11 +224,24 @@ namespace DccPacketHandler {
   }
 
   void confirmCvWrite() {
-    PORTA.OUTCLR = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
+    constexpr uint8_t allPins = CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN;
+
+    TCB0.INTCTRL = 0;        // Interrupt disable
+
+    PORTA.OUTSET = allPins;
+    waitShortly();
+    PORTA.OUTCLR = allPins;
+    waitShortly();
+    PORTA.OUTSET = allPins;
+    waitShortly();
+
+    TCB0.INTCTRL = TCB_CAPT_bm;        // Interrupt enable
+  }
+
+  void waitShortly() {
     for(uint16_t i=0; i<0xFFFF; i++) {
       __asm__ __volatile__("nop");
     }
-    PORTA.OUTSET = (CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN);
   }
 
 };

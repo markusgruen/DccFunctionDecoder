@@ -32,10 +32,11 @@ namespace DccPacketHandler {
   void getConsistAddressFromCV();
   uint16_t getAddressFromDcc();
   Direction getDirectionFromDcc();
-  void getSpeedAndDirectionFromDcc();
+  // void getSpeedAndDirectionFromDcc();
   uint32_t getFunctionsFromDcc();
   bool dccIsLongAddress();
   void confirmCvWrite();
+  void waitShortly();
 };
 
 
