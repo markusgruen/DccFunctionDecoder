@@ -26,9 +26,9 @@ namespace OutputController {
 
   void begin();
   void readCVs();
-  // void update(Direction direction, uint8_t speed, uint32_t functions);
-  void run();  
-  void update(Direction direction, uint32_t functions);
+
+  void run(Direction direction, uint32_t functions);  
+  // void update(Direction direction, uint32_t functions);
 
   bool fade(uint8_t channel, bool fade_in);
   void blinkStateMachine(uint8_t channel, bool switch_on);

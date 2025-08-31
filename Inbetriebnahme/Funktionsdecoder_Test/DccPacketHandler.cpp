@@ -13,7 +13,7 @@ namespace DccPacketHandler {
   uint8_t dccPacket[];
   uint8_t dccPacketSize;
 
-  bool hasUpdate  = false;
+  // bool hasUpdate  = false;
   Direction direction = FORWARD;
   uint8_t speed = 0;
   uint32_t functions = 0UL;
@@ -149,7 +149,7 @@ namespace DccPacketHandler {
 
   Direction getDirectionFromDcc() {
     uint8_t addressShift = (bool)dccIsLongAddress();
-    Direction oldDirection = direction;
+    // Direction oldDirection = direction;
     
     if(dccPacket[1+addressShift] == 0x3F && dccPacketSize == 3+addressShift) { // if 127 speed steps
       direction = bit_is_set(dccPacket[2+addressShift], 7) ? FORWARD : REVERSE;
@@ -158,9 +158,9 @@ namespace DccPacketHandler {
       direction = bit_is_set(dccPacket[1+addressShift], 5) ? FORWARD : REVERSE;
     }
     
-    if(direction != oldDirection) {
-      hasUpdate = true;
-    }
+    // if(direction != oldDirection) {
+    //   hasUpdate = true;
+    // }
     return direction;
   }
 
@@ -192,9 +192,9 @@ namespace DccPacketHandler {
       }
     }
    
-    if(dccFunctions != functions) {
-      hasUpdate = true;
-    }
+    // if(dccFunctions != functions) {
+    //   hasUpdate = true;
+    // }
 
     return dccFunctions;
   }

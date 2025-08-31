@@ -16,11 +16,12 @@ void setup() {
 void loop() {
 
   DccPacketHandler::run();
-  if(DccPacketHandler::hasUpdate) {
-    DccPacketHandler::hasUpdate = false;
-    OutputController::update(DccPacketHandler::direction, DccPacketHandler::functions);
-  }
+  OutputController::run(DccPacketHandler::direction, DccPacketHandler::functions);
+  // if(DccPacketHandler::hasUpdate) {
+  //   DccPacketHandler::hasUpdate = false;
+    
+  // }
   
-  OutputController::run();
+  // OutputController::run();
 
 }

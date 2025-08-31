@@ -73,25 +73,27 @@ namespace OutputController{
     // blinkOffTime[0] = 200;
   }
 
-  void update(Direction direction, uint32_t functions) {
-    for(uint8_t channel=0; channel<NUM_CHANNELS; channel++) {
-      channelState[channel] = isChannelOn(functions, channel) && directionMatchesConfig(channel, direction);
-    }
-  }
+  // void update(Direction direction, uint32_t functions) {
+  //   for(uint8_t channel=0; channel<NUM_CHANNELS; channel++) {
+  //     channelState[channel] = isChannelOn(functions, channel) && directionMatchesConfig(channel, direction);
+  //   }
+  // }
 
-  void run() {  
+  void run(Direction direction, uint32_t functions) {  
     for(uint8_t channel = 0; channel < NUM_CHANNELS; channel++) {
+      bool switch_on = isChannelOn(functions, channel) && directionMatchesConfig(channel, direction);
+
       switch(mode[channel]) {
         case FADE:
-          fade(channel, channelState[channel]);
+          fade(channel, switch_on);
           break;
 
         case BLINK:
-          blinkStateMachine(channel, channelState[channel]);
+          blinkStateMachine(channel, switch_on);
           break;
 
         case NEON:
-          neonStateMachine(channel, channelState[channel]);
+          neonStateMachine(channel, switch_on);
           break;
       }
     }
@@ -100,7 +102,6 @@ namespace OutputController{
   enum BlinkStates{BLINK_OFF, BLINK_WAIT_OFF, BLINK_FADE_IN, BLINK_WAIT_ON, BLINK_FADE_OUT};
   void blinkStateMachine(uint8_t channel, bool switch_on) {
     static BlinkStates blinkState[NUM_CHANNELS] = {BLINK_OFF};
-    uint8_t waitCount[NUM_CHANNELS] = {0};
 
     if(switch_on) {
       switch(blinkState[channel]) {
@@ -110,38 +111,32 @@ namespace OutputController{
         
         case BLINK_FADE_IN:
           if(fade(channel, 1)) {
-            waitCount[channel] = 0;
             blinkState[channel] = BLINK_WAIT_ON;
           }
           break;
 
         case BLINK_WAIT_ON:
-          waitCount[channel] += wait(channel, blinkOnTime[channel]);
-          if(waitCount[channel] >= 100) { // if wait_is_over
+          if(wait(channel, blinkOnTime[channel])) { // if wait_is_over
             blinkState[channel] = BLINK_FADE_OUT;
-            waitCount[channel] = 0;
           }
           break;
 
         case BLINK_FADE_OUT:
           if(fade(channel, 0)) {
-            waitCount[channel] = 0;
             blinkState[channel] = BLINK_WAIT_OFF;
           }
           break;
         
         case BLINK_WAIT_OFF:
-          waitCount[channel] += wait(channel, blinkOnTime[channel]);
-          if(waitCount[channel] >= 100) { // if wait_is_over
+          if(wait(channel, blinkOffTime[channel])) { // if wait_is_over
              blinkState[channel] = BLINK_FADE_IN;
              flackerCount[channel]++;
-             waitCount[channel] = 0;
           }
           break;
       }
     }
     else { // if (switch_off)
-      wait(channel, 0, true);
+      wait(channel, 0, true);  // reset wait
       if(fade(channel, 0)) {
         blinkState[channel] = BLINK_OFF;
       }
@@ -231,20 +226,25 @@ namespace OutputController{
 
   enum WaitStates{WAIT_START, WAIT_RUNNING};
   bool wait(uint8_t channel, uint8_t waitTime, bool reset){
-    static WaitStates waitState[NUM_CHANNELS] = {WAIT_START};
     static uint8_t stopTime[NUM_CHANNELS] = {0};
+    static uint8_t waitCounter[NUM_CHANNELS] = {0};
     
-    if(reset) waitState[channel] = WAIT_START;
-
-    if(waitState[channel] == WAIT_START) {
-      stopTime[channel] = vRtcOverflowCounter + waitTime;
-      waitState[channel] = WAIT_RUNNING;
+    if(reset){
+      waitCounter[channel] = 0;
+      return true;
     }
 
-    uint8_t currentTime = vRtcOverflowCounter;
-    if(currentTime == stopTime[channel]) {
-      waitState[channel] = WAIT_START;
-      return true;
+    if(waitCounter[channel] == 0) {
+      stopTime[channel] = vRtcOverflowCounter + waitTime;
+    }
+
+    if (stopTime[channel] == vRtcOverflowCounter) {
+      stopTime[channel] += waitTime;
+      waitCounter[channel]++;
+      if(waitCounter[channel] >= 10) {
+        waitCounter[channel] = 0;
+        return true;
+      }
     }
     return false;
   }
