@@ -4,21 +4,18 @@
 #include <Arduino.h>
 
 
-#define DCC_MAX_BYTES   8
+#define DCC_MAX_BYTES   8  ///< Maximum number of bytes in one DCC packet
 
 enum DccProtocolState{
-  DCCPROTOCOL__WAIT_FOR_PREAMBLE,   // Suche nach mindestens 10 Einsen und einer Null
-  DCCPROTOCOL__READ_DATA_BYTE,      // Lese 8 Datenbits
-  DCCPROTOCOL__WAIT_FOR_SEPARATOR,  // Warte auf das Startbit (0) oder Stopbit (1)
-  DCCPROTOCOL__PACKET_COMPLETE,     // Alle Bits eines Pakets vollständig empfangen
-  // DCCPROTOCOL__PACKET_VALID,        // Errorbyte wurde erfolgreich geprüft
-  DCCPROTOCOL__ERROR
+  DCCPROTOCOL__WAIT_FOR_PREAMBLE,   ///< Looking for at least 10 ones followed by a zero
+  DCCPROTOCOL__READ_DATA_BYTE,      ///< Reading 8 data bits
+  DCCPROTOCOL__WAIT_FOR_SEPARATOR,  ///< Waiting for start-bit (0) or stop-bit (1)
+  DCCPROTOCOL__PACKET_COMPLETE,     ///< A full DCC packet has been received
+  DCCPROTOCOL__ERROR                ///< Error in bitstream or framing
 };
 
 namespace DccSignalParser {
-    // extern char dccPacket[DCC_MAX_BYTES];
-    // extern uint8_t dccPacketSize;
-    extern bool newDccPacket;
+    extern bool newDccPacket;  ///< Flag: set true when a new DCC packet is available
 
     void begin();
     void run();
@@ -31,36 +28,5 @@ namespace DccSignalParser {
     bool checkErrorByteOK();
     void saveDccPacket();
 }
-/*
-class DccSignalParser {
-  public:
-    DccSignalParser();
-    void begin(char* dccPacket, uint8_t* packetSize, bool* newDccPacket);  // z.B. PIN_PA2
-    void run();
-
-  private:
-    void addBitsToBitstream();
-    void resetBitstream();
-    void evaluateBitstream();
-    bool findPreamble();
-    int8_t getSeparator();
-    bool readDataByte();
-    bool checkErrorByteOK();
-    void saveDccPacket();
-
-    char* mDccPacket = nullptr;
-    uint8_t* mPacketSize = nullptr;
-    bool* mNewDccPacket = nullptr;
-
-    char mByteStream[DCC_MAX_BYTES];
-    uint8_t mByteCount = 0;
-
-    uint8_t mNumBits = 0;
-    uint64_t mBitstream = 0;    
-    uint8_t mNumOnesInPreamble = 0;
-
-    DccProtocolState mState = DCCPROTOCOL__WAIT_FOR_PREAMBLE;
-};
-*/
 
 #endif

@@ -9,7 +9,6 @@
 void setup() {
   OutputController::begin();
   DccPacketHandler::begin();
-  // DccPacketHandler::resetCVsToDefault();
   OutputController::readCVs();
 }
 
@@ -17,11 +16,5 @@ void loop() {
 
   DccPacketHandler::run();
   OutputController::run(DccPacketHandler::direction, DccPacketHandler::functions);
-  // if(DccPacketHandler::hasUpdate) {
-  //   DccPacketHandler::hasUpdate = false;
-    
-  // }
-  
-  // OutputController::run();
 
 }

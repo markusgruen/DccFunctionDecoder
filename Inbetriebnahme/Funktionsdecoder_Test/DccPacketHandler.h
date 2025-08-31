@@ -21,22 +21,18 @@ namespace DccPacketHandler {
 
   void begin();
   void run();
-  // bool hasUpdate();
-  // Direction getDirection();
-  // uint8_t getSpeed();
-  // uint32_t getFunctions();
-  void resetCVsToDefault();
 
   void handleDccPacket();
   void getAddressFromCV();
   void getConsistAddressFromCV();
   uint16_t getAddressFromDcc();
   Direction getDirectionFromDcc();
-  // void getSpeedAndDirectionFromDcc();
   uint32_t getFunctionsFromDcc();
   bool dccIsLongAddress();
+
+  void resetCVsToDefault();
   void confirmCvWrite();
-  void waitShortly();
+  void delay_nop();
 };
 
 

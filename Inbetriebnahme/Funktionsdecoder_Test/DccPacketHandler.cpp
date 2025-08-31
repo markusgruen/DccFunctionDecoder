@@ -127,29 +127,8 @@ namespace DccPacketHandler {
     }
   }
 
-  // void getSpeedAndDirectionFromDcc() {
-  //   uint8_t addressShift = (bool)dccIsLongAddress();
-  //   uint8_t oldSpeed = speed;
-  //   Direction oldDirection = direction;
-    
-    
-  //   if(dccPacket[1+addressShift] == 0x3F && dccPacketSize == 3+addressShift) { // if 127 speed steps
-  //     speed = (dccPacket[2+addressShift] & 0b01111111) -1; // -1, because 0x01 is emergency stop and 0x02 is speed=1
-  //     direction = bit_is_set(dccPacket[2+addressShift], 7) ? FORWARD : REVERSE;
-  //   }
-  //   else if(dccPacketSize == 2+addressShift) {
-  //     speed = dccPacket[1+addressShift] & 0b00011111;
-  //     direction = bit_is_set(dccPacket[1+addressShift], 5) ? FORWARD : REVERSE;
-  //   }
-    
-  //   if((speed != oldSpeed) ||(direction != oldDirection)) {
-  //     hasUpdate = true;
-  //   }
-  // }
-
   Direction getDirectionFromDcc() {
     uint8_t addressShift = (bool)dccIsLongAddress();
-    // Direction oldDirection = direction;
     
     if(dccPacket[1+addressShift] == 0x3F && dccPacketSize == 3+addressShift) { // if 127 speed steps
       direction = bit_is_set(dccPacket[2+addressShift], 7) ? FORWARD : REVERSE;
@@ -158,9 +137,6 @@ namespace DccPacketHandler {
       direction = bit_is_set(dccPacket[1+addressShift], 5) ? FORWARD : REVERSE;
     }
     
-    // if(direction != oldDirection) {
-    //   hasUpdate = true;
-    // }
     return direction;
   }
 
@@ -191,10 +167,6 @@ namespace DccPacketHandler {
           dccFunctions = setBitsUint32(dccFunctions, dccPacket[2+addressShift], 21, 8);
       }
     }
-   
-    // if(dccFunctions != functions) {
-    //   hasUpdate = true;
-    // }
 
     return dccFunctions;
   }
@@ -203,12 +175,7 @@ namespace DccPacketHandler {
     return bit_is_set(dccPacket[0], 7);
   }
 
-
   void resetCVsToDefault() {
-    // for (uint8_t i = 0; i < numDefaultCVs; i++) {
-    //   EEPROM.update(defaultCVs[i].address, defaultCVs[i].value);
-    // }
-    
     // ############## ACHTUNG #######################
     //  DER FOLGENDE CODE KOSTET EEPROM-SCHREIBZYKLEN
     //  DAFÜR SPART ER FLASH
@@ -229,21 +196,20 @@ namespace DccPacketHandler {
     TCB0.INTCTRL = 0;        // Interrupt disable
 
     PORTA.OUTSET = allPins;
-    waitShortly();
+    delay_nop();
     PORTA.OUTCLR = allPins;
-    waitShortly();
+    delay_nop();
     PORTA.OUTSET = allPins;
-    waitShortly();
+    delay_nop();
 
     TCB0.INTCTRL = TCB_CAPT_bm;        // Interrupt enable
   }
 
-  void waitShortly() {
+  void delay_nop() {
     for(uint16_t i=0; i<0xFFFF; i++) {
       __asm__ __volatile__("nop");
     }
   }
-
 };
 
   
