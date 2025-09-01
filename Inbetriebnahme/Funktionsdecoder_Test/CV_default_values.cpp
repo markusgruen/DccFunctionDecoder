@@ -2,8 +2,7 @@
 #include "CV_table.h"
 
 const CVDefaults defaultCVs[] = {
-  {SHORTADDRESS, 3},     // CV1 = 3 (z. B. Lok-Adresse)
- // {CONFIGBYTE,   0},   // CV29 = 0 (Default von 0 passt hier)
+  {SHORTADDRESS, 3},
 
   {ch1FunctionMap0, 0b00000010},
   {ch2FunctionMap0, 0b00000100},

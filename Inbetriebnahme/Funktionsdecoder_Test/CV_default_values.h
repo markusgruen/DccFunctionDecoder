@@ -6,8 +6,8 @@
 
 
 struct CVDefaults {
-  uint8_t address;  // CV-Nummer (CV1 = 1, CV29 = 29, etc.)
-  uint8_t value;    // Wert, der in das EEPROM geschrieben werden soll
+  uint8_t address;  // CV-Number (CV1 = 1, CV29 = 29, etc.)
+  uint8_t value;    // value of CV
 };
 
 extern const CVDefaults defaultCVs[];

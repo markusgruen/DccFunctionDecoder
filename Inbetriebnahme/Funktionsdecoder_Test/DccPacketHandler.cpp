@@ -3,9 +3,9 @@
 #include "CV_default_values.h"
 #include "CV_table.h"
 #include "pinmap.h"
-#include "outputController.h" // for readCVs und dimmValue
+#include "outputController.h" // for "readCVs" und "dimmValue"
 
-
+/// Function pointer for software reset
 void(* resetController) (void) = 0;
 
 namespace DccPacketHandler {
@@ -13,10 +13,8 @@ namespace DccPacketHandler {
   uint8_t dccPacket[];
   uint8_t dccPacketSize;
 
-  // bool hasUpdate  = false;
-  Direction direction = FORWARD;
-  uint8_t speed = 0;
-  uint32_t functions = 0UL;
+  Direction direction = FORWARD; ///< Current direction
+  uint32_t functions = 0UL;      ///< Current function bitmask
 
   // Internal variables
   bool hasShortAddress = true;
@@ -24,7 +22,9 @@ namespace DccPacketHandler {
   uint8_t consistAddress = 0;
   uint8_t lastDccErrorByte = 0;
 
-
+  /**
+   * @brief Initialize the DCC packet handler (read CVs)
+   */
   void begin() {
     // read CVs
     getAddressFromCV();
@@ -33,6 +33,9 @@ namespace DccPacketHandler {
     DccSignalParser::begin();
   }
 
+  /**
+   * @brief Main loop, processes new packets when available
+   */
   void run() {
     DccSignalParser::run();
     if(DccSignalParser::newDccPacket) {
@@ -41,14 +44,19 @@ namespace DccPacketHandler {
     }
   }
 
+  /**
+   * @brief Decode and act on the current DCC packet
+   * @details Handles CV writes, direction, and function updates
+   */
   void handleDccPacket() {
     uint8_t addressShift = (bool)dccIsLongAddress();
     uint16_t dccAddress = getAddressFromDcc();
 
-    // write CVs
+    // --- Handle CV writes ---
     if((dccAddress == address) && ((dccPacket[1+addressShift] & 0b11111100) == 0b11101100)) {
       if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
         if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
+          // Decoder reset
           resetCVsToDefault();
 
           for(uint8_t i=0; i<10; i++) {
@@ -73,14 +81,13 @@ namespace DccPacketHandler {
           }
         }   
       }
-
       lastDccErrorByte = dccPacket[dccPacketSize-1];
       return;
     }
     
+    // --- Handle speed & function commands ---
     if(dccAddress == address || dccAddress == consistAddress) {
       if(bit_is_clear(dccPacket[1+addressShift], 7)) { // is speed packet
-        //getSpeedAndDirectionFromDcc();
         direction = getDirectionFromDcc();
       }
       else if(bit_is_set(dccPacket[1+addressShift], 7)) {  // is function packet
@@ -91,33 +98,34 @@ namespace DccPacketHandler {
     lastDccErrorByte = dccPacket[dccPacketSize-1];
   }
 
+  /**
+   * @brief Load locomotive address from EEPROM CVs
+   */
   void getAddressFromCV() {
     uint8_t cv29 = EEPROM.read(CONFIGBYTE);
 
-    // check if short or long address:
-    if(bit_is_set(cv29, 4)) {
+    if(bit_is_set(cv29, 4)) {  // if long address
       uint8_t cv17 = EEPROM.read(LONGADDRESS1);
       uint8_t cv18 = EEPROM.read(LONGADDRESS2);
-      // if(cv17 > 231) {  // remove to save flash
-      //   address = 0xFFFF;
-      // }
-      // else {
-        address = ((cv17 - 192) << 8) | cv18;
-      // }
+      address = ((cv17 - 192) << 8) | cv18;
     }
 
     else { // short address
-      address = EEPROM.read(SHORTADDRESS); // short address is stored in CV1
-      // if(address < 3 || address > 127) {  // remove to save flash
-      //   address = 0xFFFF;
-      // }
+      address = EEPROM.read(SHORTADDRESS);
     }
   }
 
+  /**
+   * @brief Load consist address from EEPROM
+   */
   void getConsistAddressFromCV() {
     consistAddress = EEPROM.read(CONSISTADDRESS) & 0b01111111;
   }
 
+  /**
+   * @brief Extract address from current DCC packet
+   * @return 7-bit (short) or 14-bit (long) address
+   */
   uint16_t getAddressFromDcc() {
     if(dccIsLongAddress()) {
       return (((dccPacket[0] & 0b00111111) << 8) | dccPacket[1]);
@@ -127,6 +135,10 @@ namespace DccPacketHandler {
     }
   }
 
+  /**
+   * @brief Extract direction from DCC speed packet
+   * @return FORWARD or REVERSE
+   */
   Direction getDirectionFromDcc() {
     uint8_t addressShift = (bool)dccIsLongAddress();
     
@@ -140,6 +152,10 @@ namespace DccPacketHandler {
     return direction;
   }
 
+  /**
+   * @brief Extract functions from DCC function packet
+   * @return Updated 32-bit function mask (F0..F28)
+   */
   uint32_t getFunctionsFromDcc() {
     // refactoring into the same structure as "getSpeedAndDirection" 
     // (no return, direct write of functions) DOES NOT save flash.
@@ -158,12 +174,12 @@ namespace DccPacketHandler {
       dccFunctions = setBitsUint32(dccFunctions, dccPacket[1+addressShift], 9, 4);
     }
     else if(dccPacket[1+addressShift] == (uint8_t)0b11011110) {
-      if(dccPacketSize >= 3){  // make sure to not read the checksum <-- is this necessary?
+      if(dccPacketSize >= 3){
           dccFunctions = setBitsUint32(dccFunctions, dccPacket[2+addressShift], 13, 8);
       }
     }
     else if(dccPacket[1+addressShift] == (uint8_t)0b11011111){
-      if(dccPacketSize >= 3){ // make sure to not read the checksum <-- is this necessary?
+      if(dccPacketSize >= 3){
           dccFunctions = setBitsUint32(dccFunctions, dccPacket[2+addressShift], 21, 8);
       }
     }
@@ -171,16 +187,19 @@ namespace DccPacketHandler {
     return dccFunctions;
   }
 
+  /**
+   * @brief Check if current packet uses a long address
+   * @return true if long address, false otherwise
+   */
   bool dccIsLongAddress(){
     return bit_is_set(dccPacket[0], 7);
   }
 
+  /**
+   * @brief Reset all CVs to default values
+   */
   void resetCVsToDefault() {
-    // ############## ACHTUNG #######################
-    //  DER FOLGENDE CODE KOSTET EEPROM-SCHREIBZYKLEN
-    //  DAFÜR SPART ER FLASH
-    // 
-    for (uint16_t i = 0; i < EEPROM_SIZE + 1; i++) {  // E2END = letzte EEPROM-Adresse
+    for (uint16_t i = 0; i < EEPROM_SIZE + 1; i++) {
         eeprom_write_byte((uint8_t*)i, 0);
     }
     for(uint8_t i=0; i<numDefaultCVs; i++){
@@ -190,6 +209,9 @@ namespace DccPacketHandler {
     }
   }
 
+  /**
+   * @brief Flashes all AUX-outputs to confirm CV write
+   */
   void confirmCvWrite() {
     constexpr uint8_t allPins = CH1_PIN | CH2_PIN | CH3_PIN | CH4_PIN;
 
@@ -205,6 +227,9 @@ namespace DccPacketHandler {
     TCB0.INTCTRL = TCB_CAPT_bm;        // Interrupt enable
   }
 
+  /**
+   * @brief Small delay using NOP instructions
+   */
   void delay_nop() {
     for(uint16_t i=0; i<0xFFFF; i++) {
       __asm__ __volatile__("nop");
@@ -212,7 +237,14 @@ namespace DccPacketHandler {
   }
 };
 
-  
+/**
+ * @brief Set bits in a 32-bit integer
+ * @param original Original value
+ * @param value Value to insert
+ * @param pos Starting bit position
+ * @param numBits Number of bits to overwrite
+ * @return Modified 32-bit integer
+ */
 uint32_t setBitsUint32(uint32_t original, uint32_t value, uint8_t pos, uint8_t numBits) {
   uint32_t mask = ((1UL << numBits) - 1) << pos;
   original &= ~mask;
