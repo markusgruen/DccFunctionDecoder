@@ -16,7 +16,7 @@ KiCad-Dateien sind im Ordner `Hardware` abgelegt.
 
 Die Leiterplatte hat eine Größe von ca. 7 x 7 mm. Sie ist doppelseitig und enthält nur Standardbauteile in 0603 oder größer, so dass sie auch von Hand gelötet werden kann.
 
-<img src="/Doc/DccFunctionDecoder_4ch_PinOut.png" width="300px">
+<img src="/Doc/DccFunctionDecoder_4ch_PinOut.png" width="600px">
 
 ## Software
 Die Software kann mit der normalen Arduino-Umgebung kompiliert und geflasht werden.  
