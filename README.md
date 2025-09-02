@@ -19,7 +19,7 @@ KiCad files are available in the `Hardware`-folder
 
 The PCB has a size of approx. 7 by 7 mm. PCB is double-sided and only has standard components in the size of 0603 or larger to enable hand soldering of the decoder.
 
-<img src="/Doc/DccFunctionDecoder_4ch_PinOut.png" width="300px">
+<img src="/Doc/DccFunctionDecoder_4ch_PinOut.png" width="600px">
 
 ## Software
 The software can be compiled and flashed using the Arduino environment.
