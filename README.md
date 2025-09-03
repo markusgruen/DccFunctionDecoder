@@ -33,25 +33,24 @@ You will require a standard USB-UART adapter (5V compatible). Connect the adapte
 Select the appropriate COM port in the Arduino IDE and select `Sketch -> Upload using Programmer` (or hit **CTRL+SHIFT+U**). Just hitting the `Upload`-Button (or pressing **CTRL+U**) will not work.
 
 ### Using the decoder in a locomotive or wagon
-#### Connecting LEDs
 Connect the LEDs as shown. Use appropriate resistors. The maximum current should be limited to 2 mA per LED. That does sound little but usually it is enough. Otherwise the LDO on the decoder gets too hot. 
 
 <img src="/Doc/DccFunctionDecoder_4ch_Wiring.png" width="800px">
 
-#### Programming CVs
-The decoder ONLY supports Programming on Main (POM) mode. It cannot generate an ACK. For CVs the following table below. The decoder will confirm each CV write with a short flash of all AUX channels. 
+### Programming CVs
+The decoder ONLY supports Programming on Main (POM) mode. It cannot generate an ACK. For CVs see the following table below. The decoder will confirm each CV write with a short flash of all AUX channels. 
 
-##### Programming the address
+#### Programming the address
 Special note on programming the address: If you want to change the decoder's address, you must do so in the following order:
 1. program CV3 or CV17 and CV18 as desired.
 2. program CV29 = 0 (short address) or CV29 = 32 (long address)
 
 From then on, the decoder will only accept CV writes or commands to the new address. (it will of course still accept commands to its consist address)
 
-##### Decoder reset
-The decoder can be reset to its default CV values by writing CV8 = 8. This is confirmed by multible short flashes of all AUX channels.
+#### Decoder reset
+The decoder can be reset to its default CV values by writing CV8 = 8. This is confirmed by multiple short flashes of all AUX channels.
 
-##### CV table
+#### CV table
 
 | CV | Type | range | default Value | Description |
 |----------|----------|----------|----------|----------|
@@ -60,7 +59,7 @@ The decoder can be reset to its default CV values by writing CV8 = 8. This is co
 | 18 | long address low byte  | 0...255   | 0 | CV18 = address mod 256 |
 | 19 | consist address  | 0...255   | 0 | consist address |
 | 29 | configuration byte  | 0...255   | 0 | CV29 = 0: short address;<br>CV29 = 32: long address |
-| 33...35<br>36...38<br>39...41<br>42...44 | FunctionMap AUX n <br> (3 bytes each)  | 0...255  | CV33 = 0b00000010 (F1) <br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> all others = 0  | Bit 0 = 1: AUX n controlled by F0<br> Bit 1 = 1: AUX1 controlled by F1 <br>....<br> Bit 20 = 1 : AUX n controlled by F20 <br> Bit 21: reserved <br> Bit 21 = 1: AUX n only active when forward <br> Bit 22 = 1: AUX n only active when reverse |
+| 33...35<br>36...38<br>39...41<br>42...44 | FunctionMap AUX n <br> (3 bytes each)  | 0...255  | CV33 = 0b00000010 (F1) <br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> all others = 0  | Bit 0 = 1: AUX n controlled by F0<br> Bit 1 = 1: AUX1 controlled by F1 <br>....<br> Bit 20 = 1 : AUX n controlled by F20 <br> Bit 21: reserved <br> Bit 22 = 1: AUX n only active when forward <br> Bit 23 = 1: AUX n only active when reverse |
 | 57 <br> 58 <br> 59 <br> 60  | Output mode AUX n  | 0...2   |   0 | 0 = fade <br> 1 = neon <br> 2 = Blink |
 | 65 <br> 66 <br> 67 <br> 68  | dimm value AUX n   | 0...255 | 255 | 0 = off <br> ... <br> 255 = full brightness |
 | 73 <br> 74 <br> 75 <br> 76  | fade speed AUX n   | 0...255 |   0 | 0 = instant on/off <br> ... <br> 255 = very slow fading |
