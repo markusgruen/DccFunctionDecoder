@@ -7,7 +7,6 @@ Funktionen:
 - nutzbare Funktionen F0...F20
 - 4 individuelle Ausgänge  
 - 3 Modi pro Ausgang verfügbar: FADE, BLINK, NEON  
-- Funktionszuordnung für F0...F28 pro Ausgang  
 - kurze und lange Adresse  
 - Consist-Adresse  
 
@@ -30,15 +29,14 @@ Ein Standard-USB-UART-Adapter (5V-kompatibel) wird benötigt. Der Decoder wird w
 Zum Flashen der Software in der Arduino-IDE den passenden COM-Port auswählen und dann über `Sketch -> Upload using Programmer` (oder **STRG+SHIFT+U**) die Software auf den Decoder flashen. Der normale `Upload`-Knopf (oder **STRG+U**) funktioniert hier **nicht**.  
 
 ### Einsatz in einer Lok oder einem Waggon
-#### LEDs anschließen
 Die LEDs werden wie unten gezeigt mit geeigneten Vorwiderständen (max. 2mA pro Kanal!) direkt an den Beinchen des Mikrocontrollers angeschlossen. Ein Strom von 2mA klingt erstmal nach wenig, reicht aber in der Regel aus. Andernfalls wird der LDO auf dem Decoder zu heiß.  
 
 <img src="/Doc/DccFunctionDecoder_4ch_Wiring.png" width="800px">
 
-#### CVs programmieren
+### CVs programmieren
 Der Decoder unterstützt **ausschließlich Programming on Main (POM)**. Er kann kein ACK-Signal erzeugen. Die CVs sind in der untenstehenden Tabelle näher beschrieben. Der Decoder bestätigt jedes erfolgreiches Schreiben eines CV-Wertes mit einem kurzen Aufblitzen aller AUX-Kanäle.
 
-##### Programmieren der Adresse
+#### Programmieren der Adresse
 **Wichtiger Hinweis zur Adress-Programmierung:**  
 Um die Adresse des Decoders zu ändern ist folgendes Vorgehen notwendig:
 1. CV3 oder CV17 und CV18 nach Wunsch programmieren.  
@@ -46,10 +44,10 @@ Um die Adresse des Decoders zu ändern ist folgendes Vorgehen notwendig:
 
 Ab diesem Moment akzeptiert der Decoder nur noch CV-Schreibbefehle oder Kommandos an die **neue Adresse**. (Befehle an die Consist-Adresse wird natürlich weiterhin akzeptiert.)  
 
-##### Decoder reset
+#### Decoder reset
 Der Decoder kann durch Schreiben von CV8 = 8 auf Werkseinstellungen zurückgesetzt werden. Dies wird durch mehrmaliges Aufblitzen aller AUX-Kanäle angezeigt.
 
-##### CV-Tabelle
+#### CV-Tabelle
 
 | CV | Typ | Bereich | Standardwert | Beschreibung |
 |----------|----------|----------|----------|----------|
