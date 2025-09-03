@@ -10,7 +10,7 @@ Functionality:
 - CV configurable
 - 4 individual outputs
 - 3 modes available for each output: FADE, BLINK, NEON
-- Function mapping for F0...F28 for each output
+- Function mapping for F0...F20 for each output
 - short and long address
 - consist address
 
