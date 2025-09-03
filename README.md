@@ -1,6 +1,6 @@
 # DccFunctionDecoder
 
-Hier klicken für deutsch: [Deutsche Doku](https://github.com/markusgruen/DccFunctionDecoder_Dev/blob/master/README_DE.md)
+Hier klicken für deutsch: [Deutsche Doku](https://github.com/markusgruen/DccFunctionDecoder/blob/main/README_DE.md)
 
 ---
 
