@@ -152,6 +152,7 @@
 		(property "Value" "LM3480-5.0"
 			(at 0 2.4 0)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "3a4eff81-9d59-49b2-971c-4cc5e8b86a39")
 			(effects
 				(font
@@ -417,6 +418,7 @@
 		(property "Value" "TS 4148-0603"
 			(at 0 1.43 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "71ce5920-b55c-4394-94fa-373047ff6404")
 			(effects
 				(font
@@ -679,6 +681,7 @@
 		(property "Value" "100R"
 			(at 0 1.43 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "f3004b5d-3aa1-47f2-a0dc-5dc9d411c561")
 			(effects
 				(font
@@ -881,6 +884,7 @@
 		(property "Reference" "D1"
 			(at 0 -1.43 0)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "3e0ef47b-453e-488b-a559-9294e9e6be31")
 			(effects
 				(font
@@ -892,6 +896,7 @@
 		(property "Value" "TS 4148-0603"
 			(at 0 1.43 0)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "789e008b-9ac3-4cd9-966b-4ffe264d37ac")
 			(effects
 				(font
@@ -1151,9 +1156,10 @@
 				)
 			)
 		)
-		(property "Value" "100n"
+		(property "Value" "10u"
 			(at 0 1.43 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "40ed0e9e-2de9-48d5-9c55-fd349904a67c")
 			(effects
 				(font
@@ -1368,6 +1374,7 @@
 		(property "Value" "TS 4148-0603"
 			(at 0 1.43 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "240e0bf3-1ac0-45ff-91ef-b4b5cc1957a3")
 			(effects
 				(font
@@ -1627,9 +1634,10 @@
 				)
 			)
 		)
-		(property "Value" "100n"
+		(property "Value" "10u"
 			(at 0 1.43 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "b78f1a7d-cce1-492e-988e-411ac678600c")
 			(effects
 				(font
@@ -1844,6 +1852,7 @@
 		(property "Value" "TS 4148-0603"
 			(at 0 1.43 0)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "f27beec2-a492-4adb-978f-85e7e6882930")
 			(effects
 				(font
@@ -2106,6 +2115,7 @@
 		(property "Value" "TS 4148-0603"
 			(at 0 1.43 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "ffae4c44-a0a5-4f13-b918-4a54de0cd4bb")
 			(effects
 				(font
@@ -2456,9 +2466,10 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "100k"
+		(property "Value" "22k"
 			(at 0 -1.43 90)
 			(layer "B.Fab")
+			(hide yes)
 			(uuid "2ce68b50-b40e-4fba-8b64-1eca31257b40")
 			(effects
 				(font
@@ -2769,6 +2780,7 @@
 		(property "Value" "ATtiny402-SS"
 			(at 0 -3.4 90)
 			(layer "B.Fab")
+			(hide yes)
 			(uuid "db08ce07-cfe3-4abf-bcd8-599e32c7304e")
 			(effects
 				(font
@@ -2963,18 +2975,6 @@
 			)
 			(layer "B.Fab")
 			(uuid "c20d41c5-83d7-4f9c-84cb-2b01a7955f95")
-		)
-		(fp_text user "${REFERENCE}"
-			(at -0.127 -0.127 90)
-			(layer "B.Fab")
-			(uuid "d2ded7c1-eb01-4a12-8c61-815144a45d64")
-			(effects
-				(font
-					(size 0.98 0.98)
-					(thickness 0.15)
-				)
-				(justify mirror)
-			)
 		)
 		(pad "1" smd roundrect
 			(at -2.475 1.905 90)
