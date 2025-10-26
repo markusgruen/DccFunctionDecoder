@@ -151,8 +151,8 @@ namespace OutputController{
           break;
         
         case NEON_FLICKER:
-          if(flackerCount[channel] <= myRandomNumber(4, 20)) {
-            blinkOffTime[channel] = myRandomNumber(32,160); 
+          if(flackerCount[channel] <= myRandomNumber(6, 38)) {
+            blinkOffTime[channel] = myRandomNumber(2,48); 
             blinkStateMachine(channel, 1);
           }
           else {
@@ -277,7 +277,7 @@ namespace OutputController{
 };
 
 // Random helpers
-uint16_t lfsr16 = 0xACE1;
+uint16_t lfsr16 = 0xACB1;
 /**
  * @brief Generate pseudo-random 16-bit number using LFSR.
  */

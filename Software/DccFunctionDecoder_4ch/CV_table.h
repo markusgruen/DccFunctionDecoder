@@ -2,6 +2,10 @@
 #define CV_TABLE_H
 
 
+#define DEFAULT_SHORT_ADDRESS 3
+#define DEFAULT_LONG_ADDRESS 1000
+#define MAGIC_ADDRESS  10239  // decoder can always be programmed using this address
+
 //      EEPROMaddress    CV
 #define SHORTADDRESS      1
 #define LONGADDRESS1     17

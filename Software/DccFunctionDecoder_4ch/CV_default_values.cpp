@@ -1,8 +1,14 @@
 #include "CV_default_values.h"
 #include "CV_table.h"
 
+constexpr uint8_t LONG_ADDRESS_VALUE1 = 192 + DEFAULT_LONG_ADDRESS / 256;
+constexpr uint8_t LONG_ADDRESS_VALUE2 = DEFAULT_LONG_ADDRESS % 256;
+
+
 const CVDefaults defaultCVs[] = {
-  {SHORTADDRESS, 3},
+  {SHORTADDRESS, DEFAULT_SHORT_ADDRESS},
+  {LONGADDRESS1, LONG_ADDRESS_VALUE1},
+  {LONGADDRESS2, LONG_ADDRESS_VALUE2},
 
   {ch1FunctionMap0, 0b00000010},
   {ch2FunctionMap0, 0b00000100},

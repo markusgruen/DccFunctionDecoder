@@ -32,6 +32,10 @@ You will require a standard USB-UART adapter (5V compatible). Connect the adapte
 
 Select the appropriate COM port in the Arduino IDE and select `Sketch -> Upload using Programmer` (or hit **CTRL+SHIFT+U**). Just hitting the `Upload`-Button (or pressing **CTRL+U**) will not work.
 
+### First usage of the decoder after flashing
+Right after flashing, the Decoder is NOT yet ready for usage, as the ATtiny's EEPROM is still on factory default and the decoder therefore has an unknown address. You can already wire up the decoder as described in the following section. Then, perform a factory reset of the decoder by writing the value 8 to CV8, using the decoder's magic address 10239. In case you forgot your decoder's address, you can always perform CV writes using the magic address 10239. If you are using DecoderPro, proceed as shown below: 
+<img src="/Doc/DccFunctionDecoder_4ch_FactoryReset.png" width="800px">
+
 ### Using the decoder in a locomotive or wagon
 Connect the LEDs as shown. Use appropriate resistors. The maximum current should be limited to 2 mA per LED. That does sound little but usually it is enough. Otherwise the LDO on the decoder gets too hot. 
 
@@ -55,8 +59,8 @@ The decoder can be reset to its default CV values by writing CV8 = 8. This is co
 | CV | Type | range | default Value | Description |
 |----------|----------|----------|----------|----------|
 | 1 | address | 1...127 | 3 | short address |
-| 17 | long Address high byte | 192...255 | 0 | CV17 = 192 + (address / 256) |
-| 18 | long address low byte  | 0...255   | 0 | CV18 = address mod 256 |
+| 17 | long Address high byte | 192...255 | 195 | CV17 = 192 + (address / 256) |
+| 18 | long address low byte  | 0...255   | 232 | CV18 = address mod 256 |
 | 19 | consist address  | 0...255   | 0 | consist address |
 | 29 | configuration byte  | 0...255   | 0 | CV29 = 0: short address;<br>CV29 = 32: long address |
 | 33...35<br>36...38<br>39...41<br>42...44 | FunctionMap AUX n <br> (3 bytes each)  | 0...255  | CV33 = 0b00000010 (F1) <br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> all others = 0  | Bit 0 = 1: AUX n controlled by F0<br> Bit 1 = 1: AUX1 controlled by F1 <br>....<br> Bit 20 = 1 : AUX n controlled by F20 <br> Bit 21: reserved <br> Bit 22 = 1: AUX n only active when forward <br> Bit 23 = 1: AUX n only active when reverse |

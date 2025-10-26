@@ -17,8 +17,8 @@ namespace DccPacketHandler {
   uint32_t functions = 0UL;      ///< Current function bitmask
 
   // Internal variables
-  bool hasShortAddress = true;
-  uint16_t address = 3;
+  uint16_t address = DEFAULT_SHORT_ADDRESS;
+  uint16_t magicAddress = MAGIC_ADDRESS;
   uint8_t consistAddress = 0;
   uint8_t lastDccErrorByte = 0;
 
@@ -53,7 +53,7 @@ namespace DccPacketHandler {
     uint16_t dccAddress = getAddressFromDcc();
 
     // --- Handle CV writes ---
-    if((dccAddress == address) && ((dccPacket[1+addressShift] & 0b11111100) == 0b11101100)) {
+    if((dccAddress == address || dccAddress == magicAddress) && ((dccPacket[1+addressShift] & 0b11111100) == 0b11101100)) {
       if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
         if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
           // Decoder reset
@@ -108,10 +108,16 @@ namespace DccPacketHandler {
       uint8_t cv17 = EEPROM.read(LONGADDRESS1);
       uint8_t cv18 = EEPROM.read(LONGADDRESS2);
       address = ((cv17 - 192) << 8) | cv18;
+      if(address <= 127 || address > 10239) {
+        address = DEFAULT_LONG_ADDRESS;
+      }
     }
 
     else { // short address
       address = EEPROM.read(SHORTADDRESS);
+      if(address == 0 || address > 127) {
+        address = DEFAULT_SHORT_ADDRESS;
+      }
     }
   }
 
