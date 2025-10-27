@@ -63,7 +63,7 @@ The decoder can be reset to its default CV values by writing CV8 = 8. This is co
 | 18 | long address low byte  | 0...255   | 232 | CV18 = address mod 256 |
 | 19 | consist address  | 0...255   | 0 | consist address |
 | 29 | configuration byte  | 0...255   | 0 | CV29 = 0: short address;<br>CV29 = 32: long address |
-| 33...35<br>36...38<br>39...41<br>42...44 | FunctionMap AUX n <br> (3 bytes each)  | 0...255  | CV33 = 0b00000010 (F1) <br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> all others = 0  | Bit 0 = 1: AUX n controlled by F0<br> Bit 1 = 1: AUX1 controlled by F1 <br>....<br> Bit 20 = 1 : AUX n controlled by F20 <br> Bit 21: reserved <br> Bit 22 = 1: AUX n only active when forward <br> Bit 23 = 1: AUX n only active when reverse |
+| 33...35<br>36...38<br>39...41<br>42...44 | FunctionMap AUX n <br> (3 bytes for each AUX. The 3 bytes form a "word" with 24 bits)  | each CV: 0...255  | CV33 = 0b00000010 (F1) <br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> all others = 0  | Bit 0 = 1: AUX n controlled by F0<br> Bit 1 = 1: AUX n controlled by F1 <br>...<br> Bit 20 = 1 : AUX n controlled by F20 <br> Bit 21: reserved <br> Bit 22 = 1: AUX n only active when forward <br> Bit 23 = 1: AUX n only active when reverse |
 | 57 <br> 58 <br> 59 <br> 60  | Output mode AUX n  | 0...2   |   0 | 0 = fade <br> 1 = neon <br> 2 = Blink |
 | 65 <br> 66 <br> 67 <br> 68  | dimm value AUX n   | 0...255 | 255 | 0 = off <br> ... <br> 255 = full brightness |
 | 73 <br> 74 <br> 75 <br> 76  | fade speed AUX n   | 0...255 |   0 | 0 = instant on/off <br> ... <br> 255 = very slow fading |

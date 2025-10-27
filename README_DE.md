@@ -60,7 +60,7 @@ Der Decoder kann durch Schreiben von CV8 = 8 auf Werkseinstellungen zurückgeset
 | 18 | lange Adresse Low-Byte  | 0...255   | 232 | CV18 = Adresse modulo 256 |
 | 19 | Consist-Adresse  | 0...255   | 0 | Consist-Adresse |
 | 29 | Konfigurationsbyte  | 0...255   | 0 | CV29 = 0: kurze Adresse;<br>CV29 = 32: lange Adresse |
-| 33...35<br>36...38<br>39...41<br>42...44 | Funktionszuordnung AUX n <br> (jeweils 3 Bytes)  | 0...255  | CV33 = 0b00000010 (F1)<br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> alle anderen = 0  | Bit 0 = 1: AUX n durch F0 gesteuert<br> Bit 1 = 1: AUX n durch F1 gesteuert <br>....<br> Bit 20 = 1 : AUX n durch F20 gesteuert <br> Bit 21: reserviert <br> Bit 22 = 1: AUX n nur aktiv bei Vorwärtsfahrt <br> Bit 23 = 1: AUX n nur aktiv bei Rückwärtsfahrt |
+| 33...35<br>36...38<br>39...41<br>42...44 | Funktionszuordnung AUX n <br> (jeweils 3 Bytes. Die 3 Bytes formen ein "word" mit 24 bits)  | jede CV: 0...255  | CV33 = 0b00000010 (F1)<br> CV36 = 0b00000100 (F2) <br> CV39 = 0b00001000 (F3) <br> CV42 = 0b00010000 (F4) <br> alle anderen = 0  | Bit 0 = 1: AUX n durch F0 gesteuert<br> Bit 1 = 1: AUX n durch F1 gesteuert <br>....<br> Bit 20 = 1 : AUX n durch F20 gesteuert <br> Bit 21: reserviert <br> Bit 22 = 1: AUX n nur aktiv bei Vorwärtsfahrt <br> Bit 23 = 1: AUX n nur aktiv bei Rückwärtsfahrt |
 | 57 <br> 58 <br> 59 <br> 60  | Ausgangsmodus AUX n  | 0...2   |   0 | 0 = Fade <br> 1 = Neon <br> 2 = Blink |
 | 65 <br> 66 <br> 67 <br> 68  | Dimmwert AUX n   | 0...255 | 255 | 0 = aus <br> ... <br> 255 = volle Helligkeit |
 | 73 <br> 74 <br> 75 <br> 76  | Fade-Geschwindigkeit AUX n   | 0...255 |   0 | 0 = hart an/aus <br> ... <br> 255 = sehr langsames Fading |
