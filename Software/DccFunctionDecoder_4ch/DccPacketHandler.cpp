@@ -52,46 +52,48 @@ namespace DccPacketHandler {
     uint8_t addressShift = (bool)dccIsLongAddress();
     uint16_t dccAddress = getAddressFromDcc();
 
-    // --- Handle CV writes ---
-    if((dccAddress == address || dccAddress == magicAddress) && ((dccPacket[1+addressShift] & 0b11111100) == 0b11101100)) {
-      if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
-        if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
-          // Decoder reset
-          resetCVsToDefault();
+    if(dccAddress > 0) {
+      // --- Handle CV writes ---
+      if((dccAddress == address || dccAddress == magicAddress) && ((dccPacket[1+addressShift] & 0b11111100) == 0b11101100)) {
+        if(dccPacket[dccPacketSize-1] == lastDccErrorByte) {  // confirm that two consecutive CV-write commands have been received 
+          if(dccPacket[2+addressShift] == 7 && dccPacket[3+addressShift] == 8 ) { // Decoder reset?
+            // Decoder reset
+            resetCVsToDefault();
 
-          for(uint8_t i=0; i<10; i++) {
-            confirmCvWrite();
-          }
+            for(uint8_t i=0; i<10; i++) {
+              confirmCvWrite();
+            }
 
-          resetController();
-        }
-        else {
-          EEPROM.update(dccPacket[2+addressShift]+1, dccPacket[3+addressShift]); // [1] = address; [2] = value;
-          confirmCvWrite();
-          if(dccPacket[2+addressShift]+1 == CONFIGBYTE) {  // update address if CV 29 was written
-            getAddressFromCV();           
+            resetController();
           }
           else {
-            getConsistAddressFromCV();
-            OutputController::readCVs();
-            vPwmValue[0] = OutputController::dimmValue[0];
-            vPwmValue[1] = OutputController::dimmValue[1];
-            vPwmValue[2] = OutputController::dimmValue[2];
-            vPwmValue[3] = OutputController::dimmValue[3];
-          }
-        }   
+            EEPROM.update(dccPacket[2+addressShift]+1, dccPacket[3+addressShift]); // [1] = address; [2] = value;
+            confirmCvWrite();
+            if(dccPacket[2+addressShift]+1 == CONFIGBYTE) {  // update address if CV 29 was written
+              getAddressFromCV();           
+            }
+            else {
+              getConsistAddressFromCV();
+              OutputController::readCVs();
+              vPwmValue[0] = OutputController::dimmValue[0];
+              vPwmValue[1] = OutputController::dimmValue[1];
+              vPwmValue[2] = OutputController::dimmValue[2];
+              vPwmValue[3] = OutputController::dimmValue[3];
+            }
+          }   
+        }
+        lastDccErrorByte = dccPacket[dccPacketSize-1];
+        return;
       }
-      lastDccErrorByte = dccPacket[dccPacketSize-1];
-      return;
-    }
-    
-    // --- Handle speed & function commands ---
-    if(dccAddress == address || dccAddress == consistAddress) {
-      if(bit_is_clear(dccPacket[1+addressShift], 7)) { // is speed packet
-        direction = getDirectionFromDcc();
-      }
-      else if(bit_is_set(dccPacket[1+addressShift], 7)) {  // is function packet
-        functions = getFunctionsFromDcc();
+      
+      // --- Handle speed & function commands ---
+      if(dccAddress == address || dccAddress == consistAddress) {
+        if(bit_is_clear(dccPacket[1+addressShift], 7)) { // is speed packet
+          direction = getDirectionFromDcc();
+        }
+        else if(bit_is_set(dccPacket[1+addressShift], 7)) {  // is function packet
+          functions = getFunctionsFromDcc();
+        }
       }
     }
 

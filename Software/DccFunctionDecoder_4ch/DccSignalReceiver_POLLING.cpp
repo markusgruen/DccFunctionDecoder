@@ -104,9 +104,13 @@ ISR(TCA0_CMP0_vect) {
           sBitCount = 0;
           sBitstreamByte = 0;
         }
-      }
 
-      sLastHalfBit = 0xFF; // reset after each pair
+        sLastHalfBit = 0xFF; // reset after each pair
+      }
+      else {
+        sLastHalfBit = thisHalfBit;
+      }
+      
     }
   }
 
